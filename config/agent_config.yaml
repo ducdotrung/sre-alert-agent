@@ -1,0 +1,74 @@
+# Sentry Alert Agent Configuration
+# Environment variables: ${VAR_NAME} or ${VAR_NAME:default_value}
+
+# Sentry configuration
+sentry:
+  base_url: ${SENTRY_BASE_URL}
+  auth_token: ${SENTRY_AUTH_TOKEN}
+  organization: ${SENTRY_ORG:}
+  projects: ${SENTRY_PROJECTS:}
+  environment: ${SENTRY_ENVIRONMENT:}
+  query: ${SENTRY_QUERY:is:unresolved}
+  limit: ${SENTRY_LIMIT:100}
+
+# Common settings for all agents
+common:
+  output_dir: ${SENTRY_OUTPUT_DIR:./output}
+  log_level: ${LOG_LEVEL:INFO}
+
+# Agent 1: Triage Agent
+triage_agent:
+  enabled: true
+  lookback_hours: 1  # Check last 1 hour
+  rule_confidence_threshold: 0.7  # Use AI if rule confidence < this
+
+  # AI settings
+  ai:
+    enabled: true
+    provider: ${AI_PROVIDER:deepseek}
+    model: ${AI_MODEL:deepseek-chat}
+    api_key: ${DEEPSEEK_API_KEY:}
+    timeout: 60
+
+  # Rule-based classification
+  classification_rules: config/classification_rules.yaml
+  priority_thresholds: config/priority_thresholds.yaml
+  ignore_rules: config/ignore_rules.json
+
+# Agent 2: Review Agent
+review_agent:
+  enabled: true
+  filter_priorities: ["P0", "P1"]  # Only review critical issues
+  auto_send_confidence_threshold: 0.80  # Auto-approve if confidence > this (lowered from 0.85)
+
+  # AI settings
+  ai:
+    enabled: true
+    provider: ${AI_PROVIDER:deepseek}
+    model: ${AI_MODEL:deepseek-chat}
+    api_key: ${DEEPSEEK_API_KEY:}
+    timeout: 60
+
+# Agent 3: Recommendation Agent
+recommendation_agent:
+  enabled: true
+
+  # AI settings
+  ai:
+    enabled: true
+    provider: ${AI_PROVIDER:deepseek}
+    model: ${AI_MODEL:deepseek-chat}
+    api_key: ${DEEPSEEK_API_KEY:}
+    timeout: 90
+
+  # Context enrichment (future features)
+  include_deployment_context: false
+  include_similar_incidents: false
+  max_recommendations: 5
+
+# Sender configuration
+sender:
+  teams_webhook_url: ${TEAMS_WEBHOOK_URL:}
+  timeout: ${TEAMS_TIMEOUT:15}
+  dry_run: ${SENDER_DRY_RUN:false}
+  max_last_seen_age_hours: ${TEAMS_MAX_LAST_SEEN_AGE_HOURS:48}

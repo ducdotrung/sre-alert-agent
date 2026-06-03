@@ -1,0 +1,46 @@
+# Secrets and local config
+*.env
+.env
+.env.*
+*.secret
+*.secrets
+*secret*
+*token*
+sentry-triage.env
+sentry-ignore.json
+
+# Generated Sentry output and alert delivery artifacts
+output/
+!output/.gitkeep
+sentry-playbooks/
+sentry-review-output/
+**/alerts/**/*.receipt.json
+**/reports/*.md
+**/snapshots/*.json
+
+# Agent output (runtime data, don't commit)
+output/alerts/
+output/logs/
+
+# Runtime logs
+*.log
+logs/
+
+# Cache
+.cache/
+
+# Python/cache artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+
+# Applications
+*.app
+*.exe
+*.war

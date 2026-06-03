@@ -1,0 +1,116 @@
+# Issue classification keyword rules
+# Used by Triage Agent for rule-based classification
+
+classes:
+  client-disconnect:
+    keywords:
+      - "broken pipe"
+      - "clientabortexception"
+      - "connection prematurely closed"
+      - "prematurecloseexception"
+    priority: low
+
+  availability:
+    keywords:
+      - "5xx"
+      - "500"
+      - "502"
+      - "503"
+      - "504"
+      - "crash"
+      - "gateway"
+      - "service unavailable"
+      - "unavailable"
+      - "worker failed"
+    priority: critical
+
+  dependency:
+    keywords:
+      - "503"
+      - "feignexception$internalservererror"
+      - "feignexception$serviceunavailable"
+      - "httpconnectionpool"
+      - "connection refused"
+      - "database"
+      - "dns"
+      - "ecconn"
+      - "external"
+      - "kafka"
+      - "network"
+      - "postgres"
+      - "queue"
+      - "redis"
+      - "s3"
+      - "storage"
+      - "third party"
+      - "upstream"
+    priority: high
+
+  auth-permission:
+    keywords:
+      - "401"
+      - "403"
+      - "csrf"
+      - "forbidden"
+      - "permission"
+      - "signature"
+      - "token"
+      - "unauthorized"
+    priority: medium
+
+  data-integrity:
+    keywords:
+      - "duplicatekeyexception"
+      - "nullpointerexception"
+      - "sqlexception"
+      - "cannot be null"
+      - "constraint"
+      - "corrupt"
+      - "deserial"
+      - "invariant"
+      - "migration"
+      - "missing field"
+      - "parse"
+      - "schema"
+      - "serializ"
+    priority: high
+
+  input-validation:
+    keywords:
+      - "404"
+      - "notfound"
+      - "400"
+      - "bad request"
+      - "invalid"
+      - "malformed"
+      - "typeerror"
+      - "validation"
+      - "valueerror"
+    priority: low
+
+  frontend-client:
+    keywords:
+      - "browser"
+      - "chunk"
+      - "client"
+      - "hydration"
+      - "javascript"
+      - "resizeobserver"
+      - "sourcemap"
+      - "source map"
+      - "webpack"
+    priority: low
+
+  performance-timeout:
+    keywords:
+      - "deadline"
+      - "lock wait"
+      - "memory"
+      - "oom"
+      - "overload"
+      - "rate limit"
+      - "slow"
+      - "throttle"
+      - "timeout"
+      - "timed out"
+    priority: high

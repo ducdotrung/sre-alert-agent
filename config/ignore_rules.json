@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "description": "Ignore rules for Sentry issues. Edit this file to suppress known noise.",
+  "rules": [
+    {
+      "id": "example-client-disconnect-low-volume",
+      "enabled": false,
+      "class": "client-disconnect",
+      "max_count": 100,
+      "reason": "Accepted noise, client-side connection abort",
+      "expires": "2026-12-31",
+      "added_by": "sre",
+      "added_date": "2026-06-02"
+    },
+    {
+      "id": "example-specific-issue",
+      "enabled": false,
+      "issue_id": "SENTRY-1234",
+      "reason": "Known issue, fix scheduled for Q3 2026",
+      "expires": "2026-09-30",
+      "added_by": "sre",
+      "added_date": "2026-06-02"
+    },
+    {
+      "id": "example-frontend-extension",
+      "enabled": false,
+      "class": "frontend-client",
+      "title_contains": "ResizeObserver",
+      "reason": "Browser extension interference, not our code",
+      "expires": "2027-01-31",
+      "added_by": "frontend-team",
+      "added_date": "2026-06-02"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "SENTRY-1234": {
+    "reason": "Known third-party API intermittent timeout - acceptable noise",
+    "expires": "2026-12-31",
+    "added_by": "ducdt",
+    "added_date": "2026-06-02"
+  },
+  "SENTRY-5678": {
+    "reason": "Browser extension interference - client-side only, no user impact",
+    "expires": "2027-01-31",
+    "added_by": "sre-team",
+    "added_date": "2026-06-02"
+  },
+  "SENTRY-9012": {
+    "reason": "Deployment in progress - expected during rollout window",
+    "expires": "2026-06-05",
+    "added_by": "ducdt",
+    "added_date": "2026-06-02",
+    "notes": "Remove after deployment completes"
+  }
+}
