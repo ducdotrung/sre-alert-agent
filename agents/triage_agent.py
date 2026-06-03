@@ -250,7 +250,11 @@ def reclassify_with_ai(
         return {**rule_result, 'source': 'rule_based_fallback', 'ai_error': str(e)}
 
 
-def check_ignore_rules(issue: dict[str, Any], rules: list[dict[str, Any]]) -> tuple[bool, str | None]:
+def check_ignore_rules(
+    issue: dict[str, Any],
+    rules: list[dict[str, Any]],
+    issue_class: str | None = None,
+) -> tuple[bool, str | None]:
     """
     Check if issue matches any ignore rules.
 
@@ -271,6 +275,8 @@ def check_ignore_rules(issue: dict[str, Any], rules: list[dict[str, Any]]) -> tu
         if expires:
             try:
                 expire_date = dt.datetime.fromisoformat(expires.replace('Z', '+00:00'))
+                if expire_date.tzinfo is None:
+                    expire_date = expire_date.replace(tzinfo=dt.timezone.utc)
                 if expire_date < now:
                     continue  # Rule expired
             except ValueError:
@@ -283,13 +289,21 @@ def check_ignore_rules(issue: dict[str, Any], rules: list[dict[str, Any]]) -> tu
 
         # Check class + count
         if rule.get('class'):
-            # Need to get class from somewhere - skip for now in ignore check
-            pass
+            if issue_class is None or rule['class'].lower() != issue_class.lower():
+                continue
+            max_count = rule.get('max_count')
+            if max_count is None or count <= max_count:
+                # Class-only rules should match immediately once class and count fit.
+                if not rule.get('title_contains') and not rule.get('project') and not rule.get('issue_id'):
+                    return True, rule.get('reason', 'matched class rule')
 
         # Check title_contains
         if rule.get('title_contains'):
             if rule['title_contains'].lower() in title:
-                return True, rule.get('reason', 'matched title pattern')
+                max_count = rule.get('max_count')
+                if max_count is None or count <= max_count:
+                    return True, rule.get('reason', 'matched title pattern')
+                continue
 
         # Check project
         if rule.get('project'):
@@ -471,8 +485,19 @@ def main() -> int:
             short_id = issue.get('shortId', '') or str(issue.get('id', ''))
             logger.info(f"[{idx}/{len(issues)}] Triaging {short_id}")
 
-            # Check ignore rules first
-            should_ignore, ignore_reason = check_ignore_rules(issue, ignore_rules)
+            # Run a lightweight rule classification first so class-based ignore rules work.
+            pre_rule_class, _, _ = classify_by_rules(
+                issue,
+                class_rules,
+                priority_thresholds.get('confidence', {}),
+            )
+
+            # Check ignore rules before any AI call.
+            should_ignore, ignore_reason = check_ignore_rules(
+                issue,
+                ignore_rules,
+                issue_class=pre_rule_class,
+            )
 
             if should_ignore:
                 logger.info(f"  Ignored: {ignore_reason}")

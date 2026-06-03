@@ -3,14 +3,14 @@
   "description": "Ignore rules for Sentry issues. Edit this file to suppress known noise.",
   "rules": [
     {
-      "id": "example-client-disconnect-low-volume",
-      "enabled": false,
+      "id": "ignore-client-disconnect-low-volume",
+      "enabled": true,
       "class": "client-disconnect",
-      "max_count": 100,
-      "reason": "Accepted noise, client-side connection abort",
+      "max_count": 250,
+      "reason": "Accepted noise, low-volume client-side disconnects do not need review",
       "expires": "2026-12-31",
-      "added_by": "sre",
-      "added_date": "2026-06-02"
+      "added_by": "devops",
+      "added_date": "2026-06-03"
     },
     {
       "id": "example-specific-issue",
@@ -18,7 +18,7 @@
       "issue_id": "SENTRY-1234",
       "reason": "Known issue, fix scheduled for Q3 2026",
       "expires": "2026-09-30",
-      "added_by": "sre",
+      "added_by": "devops",
       "added_date": "2026-06-02"
     },
     {

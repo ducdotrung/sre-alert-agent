@@ -7,6 +7,7 @@ import base64
 import datetime as dt
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -49,10 +50,35 @@ class SentryClient:
         """
         return self._request("GET", path, params=params)
 
+    def get_with_headers(
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> tuple[Any, dict[str, str]]:
+        """
+        GET request that also returns response headers.
+
+        Args:
+            path: API path (e.g., "/api/0/organizations/")
+            params: Query parameters
+
+        Returns:
+            Tuple of (parsed JSON body, response headers)
+
+        Raises:
+            RuntimeError: If request fails
+        """
+        return self._request_with_headers("GET", path, params=params)
+
     def _request(
         self, method: str, path: str, params: dict[str, Any] | None = None
     ) -> Any:
         """Make HTTP request to Sentry API."""
+        body, _ = self._request_with_headers(method, path, params=params)
+        return body
+
+    def _request_with_headers(
+        self, method: str, path: str, params: dict[str, Any] | None = None
+    ) -> tuple[Any, dict[str, str]]:
+        """Make HTTP request to Sentry API and return parsed body with headers."""
         url = self.base_url + path
         if params:
             query = urllib.parse.urlencode(params, doseq=True)
@@ -65,13 +91,15 @@ class SentryClient:
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = response.read().decode("utf-8")
-                return json.loads(body) if body else None
+                parsed = json.loads(body) if body else None
+                headers = {k.lower(): v for k, v in response.headers.items()}
+                return parsed, headers
 
         except urllib.error.HTTPError as exc:
             # Try basic auth if bearer fails
             if exc.code in (401, 403) and self.auth_mode == "bearer":
                 self.auth_mode = "basic"
-                return self._request(method, path, params)
+                return self._request_with_headers(method, path, params)
 
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Sentry API {exc.code} for {url}: {detail}") from exc
@@ -321,5 +349,111 @@ def fetch_issues(
 
     if not isinstance(issues, list):
         raise RuntimeError("Unexpected Sentry response (expected list)")
+
+    return issues[:limit]
+
+
+def parse_next_cursor(link_header: str | None) -> tuple[str | None, bool]:
+    """
+    Parse the next cursor from Sentry's pagination Link header.
+
+    Args:
+        link_header: Raw Link header value
+
+    Returns:
+        Tuple of (cursor, has_more_results)
+    """
+    if not link_header:
+        return None, False
+
+    for part in link_header.split(","):
+        if 'rel="next"' not in part:
+            continue
+
+        has_results = 'results="true"' in part
+        cursor_match = re.search(r'cursor="([^"]+)"', part)
+        if cursor_match and has_results:
+            return cursor_match.group(1), True
+
+        url_match = re.search(r"<([^>]+)>", part)
+        if url_match and has_results:
+            parsed = urllib.parse.urlparse(url_match.group(1))
+            cursor_values = urllib.parse.parse_qs(parsed.query).get("cursor")
+            if cursor_values:
+                return cursor_values[0], True
+
+    return None, False
+
+
+def fetch_issues_paginated(
+    client: SentryClient,
+    org: str,
+    stats_period: str,
+    query: str = "is:unresolved",
+    projects: list[str] | None = None,
+    environment: str | None = None,
+    limit: int = 1000,
+    page_size: int = 100,
+) -> list[dict[str, Any]]:
+    """
+    Fetch Sentry issues across multiple pages.
+
+    Args:
+        client: Sentry client
+        org: Organization slug
+        stats_period: Time period (e.g., "1h", "7d")
+        query: Search query
+        projects: Project IDs (numbers) or None for all
+        environment: Environment filter
+        limit: Max issues to fetch across all pages
+        page_size: Page size per request (Sentry max is typically 100)
+
+    Returns:
+        List of issue dicts
+
+    Raises:
+        RuntimeError: If request fails or response shape is invalid
+    """
+    issues: list[dict[str, Any]] = []
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
+
+    while len(issues) < limit:
+        params: dict[str, Any] = {
+            "query": query,
+            "statsPeriod": stats_period,
+            "sort": "freq",
+            "limit": min(page_size, 100, max(limit - len(issues), 1)),
+            "expand": ["owners"],
+        }
+
+        if projects:
+            params["project"] = projects
+
+        if environment:
+            params["environment"] = [environment]
+
+        if cursor:
+            params["cursor"] = cursor
+
+        page, headers = client.get_with_headers(
+            f"/api/0/organizations/{urllib.parse.quote(org)}/issues/",
+            params,
+        )
+
+        if not isinstance(page, list):
+            raise RuntimeError("Unexpected Sentry response (expected list)")
+
+        if not page:
+            break
+
+        issues.extend(page)
+
+        next_cursor, has_more = parse_next_cursor(headers.get("link"))
+        if not has_more or not next_cursor or next_cursor in seen_cursors:
+            break
+
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
 
     return issues[:limit]

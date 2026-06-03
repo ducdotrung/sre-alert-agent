@@ -28,7 +28,7 @@ The rule-based system classified this as:
 Analyze this issue and provide:
 
 1. **Classification**: One of these classes:
-   - availability (service outage, crashes, 5xx errors)
+   - availability (service outage, crashes, failed workers, healthcheck failure)
    - dependency (upstream API, database, network, third-party failures)
    - auth-permission (401, 403, token, permission issues)
    - data-integrity (schema, migration, null constraint, serialization)
@@ -53,6 +53,20 @@ Analyze this issue and provide:
 5. **Reasoning**: Brief explanation (1-2 sentences)
    - Why did you choose this classification?
    - What signals were most important?
+
+## Important Classification Guidance
+
+- Do not treat every 5xx as `availability`.
+- Prefer `dependency` for database, Redis, upstream API, MySQL, connection pool, lost connection, bad gateway, retry exhaustion, Mixpanel, or network transport failures.
+- Prefer `data-integrity` for schema drift, unknown columns, serialization failures, invalid persistence assumptions, and local coding defects such as `UnboundLocalError`.
+- Prefer `performance-timeout` when the main signal is timeout, retry exhaustion, overload, or slow execution rather than a hard dependency outage.
+- Prefer `client-disconnect` for broken pipe, premature close, or client abort patterns unless there is strong evidence of a backend outage.
+
+## Project-Specific Hints
+
+- `ai-service` issues mentioning MySQL `OperationalError`, lost connection, communication packet, `RetryError`, `ReadTimeout`, or Mixpanel are usually `dependency` or `performance-timeout`, not `unknown`.
+- `ai-service` issues mentioning `Unknown column`, migration drift, or `UnboundLocalError` are usually `data-integrity`.
+- Backend issues with worker crashes, exit codes, OOM, or failed health checks are stronger `availability` signals than plain HTTP status codes.
 
 ## Response Format
 
