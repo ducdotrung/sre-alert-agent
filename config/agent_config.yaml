@@ -1,7 +1,74 @@
-# Sentry Alert Agent Configuration
+# Alert Agent Configuration
 # Environment variables: ${VAR_NAME} or ${VAR_NAME:default_value}
 
-# Sentry configuration
+# Shared source definitions
+sources:
+  sentry:
+    enabled: true
+    kind: sentry
+    policy_pack: sentry-default
+    config:
+      base_url: ${SENTRY_BASE_URL}
+      auth_token: ${SENTRY_AUTH_TOKEN}
+      organization: ${SENTRY_ORG:}
+      projects: ${SENTRY_PROJECTS:}
+      environment: ${SENTRY_ENVIRONMENT:}
+      query: ${SENTRY_QUERY:is:unresolved}
+      limit: ${SENTRY_LIMIT:100}
+
+# Source or team-specific policy packs
+policy_packs:
+  sentry-default:
+    name: sentry-default
+    classification_rules: config/classification_rules.yaml
+    priority_thresholds: config/priority_thresholds.yaml
+    ignore_rules: config/ignore_rules.json
+    prompts:
+      triage: prompts/triage_reclassify.md
+      review: prompts/review_decision.md
+      recommendation: prompts/recommendation_generate.md
+
+# Shared pipeline stage settings
+pipeline:
+  triage:
+    enabled: true
+    lookback_hours: 1
+    rule_confidence_threshold: 0.7
+    ai:
+      enabled: true
+      provider: ${AI_PROVIDER:azure-openai-responses}
+      model: ${AI_MODEL:}
+      api_key: ${AI_API_KEY:}
+      timeout: 60
+
+  review:
+    enabled: true
+    filter_priorities: ["P0", "P1"]
+    auto_send_confidence_threshold: 0.80
+    pending_review_notification_enabled: ${PENDING_REVIEW_NOTIFICATION_ENABLED:false}
+    pending_review_webhook_url: ${TEAMS_PENDING_REVIEW_WEBHOOK_URL:${TEAMS_WEBHOOK_URL:}}
+    pending_review_notify_teams: ${PENDING_REVIEW_NOTIFY_TEAMS:backend-team}
+    pending_review_notification_state_file: ${PENDING_REVIEW_NOTIFICATION_STATE_FILE:}
+    ai:
+      enabled: true
+      provider: ${AI_PROVIDER:azure-openai-responses}
+      model: ${AI_MODEL:}
+      api_key: ${AI_API_KEY:}
+      timeout: 60
+
+  recommendation:
+    enabled: true
+    include_deployment_context: false
+    include_similar_incidents: false
+    max_recommendations: 5
+    ai:
+      enabled: true
+      provider: ${AI_PROVIDER:azure-openai-responses}
+      model: ${AI_MODEL:}
+      api_key: ${AI_API_KEY:}
+      timeout: 90
+
+# Legacy Sentry section kept for compatibility during migration
 sentry:
   base_url: ${SENTRY_BASE_URL}
   auth_token: ${SENTRY_AUTH_TOKEN}
@@ -14,9 +81,17 @@ sentry:
 # Common settings for all agents
 common:
   output_dir: ${SENTRY_OUTPUT_DIR:./output}
+  metrics_dir: ${SENTRY_METRICS_DIR:./output/metrics}
+  run_id: ${RUN_ID:}
   log_level: ${LOG_LEVEL:INFO}
+  review_web_base_url: ${REVIEW_WEB_BASE_URL:}
+  ai_pricing:
+    input_per_million: ${AI_COST_INPUT_PER_MILLION:0}
+    output_per_million: ${AI_COST_OUTPUT_PER_MILLION:0}
+    cache_read_per_million: ${AI_COST_CACHE_READ_PER_MILLION:0}
+    cache_write_per_million: ${AI_COST_CACHE_WRITE_PER_MILLION:0}
 
-# Agent 1: Triage Agent
+# Legacy stage sections kept for compatibility during migration
 triage_agent:
   enabled: true
   lookback_hours: 1  # Check last 1 hour
@@ -25,9 +100,9 @@ triage_agent:
   # AI settings
   ai:
     enabled: true
-    provider: ${AI_PROVIDER:deepseek}
-    model: ${AI_MODEL:deepseek-chat}
-    api_key: ${DEEPSEEK_API_KEY:}
+    provider: ${AI_PROVIDER:azure-openai-responses}
+    model: ${AI_MODEL:}
+    api_key: ${AI_API_KEY:}
     timeout: 60
 
   # Rule-based classification
@@ -40,13 +115,17 @@ review_agent:
   enabled: true
   filter_priorities: ["P0", "P1"]  # Only review critical issues
   auto_send_confidence_threshold: 0.80  # Auto-approve if confidence > this (lowered from 0.85)
+  pending_review_notification_enabled: ${PENDING_REVIEW_NOTIFICATION_ENABLED:false}
+  pending_review_webhook_url: ${TEAMS_PENDING_REVIEW_WEBHOOK_URL:${TEAMS_WEBHOOK_URL:}}
+  pending_review_notify_teams: ${PENDING_REVIEW_NOTIFY_TEAMS:backend-team}
+  pending_review_notification_state_file: ${PENDING_REVIEW_NOTIFICATION_STATE_FILE:}
 
   # AI settings
   ai:
     enabled: true
-    provider: ${AI_PROVIDER:deepseek}
-    model: ${AI_MODEL:deepseek-chat}
-    api_key: ${DEEPSEEK_API_KEY:}
+    provider: ${AI_PROVIDER:azure-openai-responses}
+    model: ${AI_MODEL:}
+    api_key: ${AI_API_KEY:}
     timeout: 60
 
 # Agent 3: Recommendation Agent
@@ -56,9 +135,9 @@ recommendation_agent:
   # AI settings
   ai:
     enabled: true
-    provider: ${AI_PROVIDER:deepseek}
-    model: ${AI_MODEL:deepseek-chat}
-    api_key: ${DEEPSEEK_API_KEY:}
+    provider: ${AI_PROVIDER:azure-openai-responses}
+    model: ${AI_MODEL:}
+    api_key: ${AI_API_KEY:}
     timeout: 90
 
   # Context enrichment (future features)
@@ -72,3 +151,67 @@ sender:
   timeout: ${TEAMS_TIMEOUT:15}
   dry_run: ${SENDER_DRY_RUN:false}
   max_last_seen_age_hours: ${TEAMS_MAX_LAST_SEEN_AGE_HOURS:48}
+
+# Usage monitor
+monitor:
+  enabled: ${AI_MONITOR_ENABLED:true}
+  teams_webhook_url: ${TEAMS_MONITOR_WEBHOOK_URL:${TEAMS_WEBHOOK_URL:}}
+  timeout: ${TEAMS_TIMEOUT:15}
+  monthly_budget_usd: ${AI_MONTHLY_BUDGET_USD:0}
+  daily_budget_usd: ${AI_DAILY_BUDGET_USD:0}
+  thresholds_percent: ${AI_BUDGET_THRESHOLDS_PERCENT:50,80,100}
+  state_file: ${AI_MONITOR_STATE_FILE:}
+
+# Pipeline health monitor
+health_monitor:
+  enabled: ${HEALTH_MONITOR_ENABLED:true}
+  teams_webhook_url: ${TEAMS_MONITOR_WEBHOOK_URL:${TEAMS_WEBHOOK_URL:}}
+  timeout: ${TEAMS_TIMEOUT:15}
+  stale_run_after_minutes: ${HEALTH_STALE_RUN_AFTER_MINUTES:120}
+  stuck_lock_after_minutes: ${HEALTH_STUCK_LOCK_AFTER_MINUTES:90}
+  state_file: ${HEALTH_MONITOR_STATE_FILE:}
+  pipeline_state_file: ${PIPELINE_STATE_FILE:}
+  lock_file: ${LOCK_FILE:/tmp/sentry-alert-agent.lock}
+
+# Queue and workflow monitor
+queue_monitor:
+  enabled: ${QUEUE_MONITOR_ENABLED:true}
+  teams_webhook_url: ${TEAMS_MONITOR_WEBHOOK_URL:${TEAMS_WEBHOOK_URL:}}
+  timeout: ${TEAMS_TIMEOUT:15}
+  pending_threshold: ${QUEUE_PENDING_THRESHOLD:10}
+  approved_stale_hours: ${QUEUE_APPROVED_STALE_HOURS:4}
+  recommendation_stale_hours: ${QUEUE_RECOMMENDATION_STALE_HOURS:2}
+  state_file: ${QUEUE_MONITOR_STATE_FILE:}
+
+# Daily summary
+daily_summary:
+  enabled: ${DAILY_SUMMARY_ENABLED:true}
+  teams_webhook_url: ${TEAMS_MONITOR_WEBHOOK_URL:${TEAMS_WEBHOOK_URL:}}
+  timeout: ${TEAMS_TIMEOUT:15}
+  send_after_hour_utc: ${DAILY_SUMMARY_SEND_AFTER_HOUR_UTC:23}
+  state_file: ${DAILY_SUMMARY_STATE_FILE:}
+
+# Budget enforcement
+budget_enforcement:
+  enabled: ${BUDGET_ENFORCEMENT_ENABLED:false}
+  mode: ${BUDGET_ENFORCEMENT_MODE:warn_only}
+  period: ${BUDGET_ENFORCEMENT_PERIOD:either}
+  teams_webhook_url: ${TEAMS_MONITOR_WEBHOOK_URL:${TEAMS_WEBHOOK_URL:}}
+  timeout: ${TEAMS_TIMEOUT:15}
+  state_file: ${BUDGET_ENFORCEMENT_STATE_FILE:}
+
+# Self-improvement analyzer
+self_improve:
+  enabled: ${SELF_IMPROVE_ENABLED:false}
+  output_dir: ${SELF_IMPROVE_OUTPUT_DIR:./output/improvement}
+  state_file: ${SELF_IMPROVE_STATE_FILE:}
+  min_review_events: ${SELF_IMPROVE_MIN_REVIEW_EVENTS:3}
+  max_proposals: ${SELF_IMPROVE_MAX_PROPOSALS:12}
+  ai:
+    enabled: ${SELF_IMPROVE_AI_ENABLED:true}
+    provider: ${SELF_IMPROVE_AI_PROVIDER:${AI_PROVIDER:azure-openai-responses}}
+    model: ${SELF_IMPROVE_AI_MODEL:${AI_MODEL:}}
+    api_key: ${SELF_IMPROVE_AI_API_KEY:${AZURE_OPENAI_API_KEY:}}
+    base_url: ${SELF_IMPROVE_AI_BASE_URL:${AZURE_OPENAI_BASE_URL:}}
+    deployment_name_map: ${SELF_IMPROVE_AI_DEPLOYMENT_NAME_MAP:${AZURE_OPENAI_DEPLOYMENT_NAME_MAP:}}
+    timeout: ${SELF_IMPROVE_AI_TIMEOUT:120}

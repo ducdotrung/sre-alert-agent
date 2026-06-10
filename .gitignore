@@ -2,6 +2,7 @@
 *.env
 .env
 .env.*
+!.env.example
 *.secret
 *.secrets
 *secret*
@@ -39,6 +40,9 @@ __pycache__/
 .vscode/
 .idea/
 Thumbs.db
+
+# Local repo working notes
+repo-memory/_scratch/
 
 # Applications
 *.app

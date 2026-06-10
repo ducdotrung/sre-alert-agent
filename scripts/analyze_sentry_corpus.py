@@ -16,10 +16,10 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "agents"))
+sys.path.insert(0, str(REPO_ROOT))
 
-from shared.config_loader import load_agent_config
-from shared.sentry_client import (
+from alert_agent.core.config_loader import load_agent_config
+from alert_agent.core.sentry_client import (
     SentryClient,
     discover_org,
     fetch_issues_paginated,

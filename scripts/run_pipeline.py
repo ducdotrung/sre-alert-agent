@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility wrapper for the shared triage stage."""
+"""Compatibility wrapper for the shared pipeline command."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from alert_agent.pipeline.triage import main
+from alert_agent.commands.run_pipeline import main
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())
