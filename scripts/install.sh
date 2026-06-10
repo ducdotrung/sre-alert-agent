@@ -16,7 +16,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="${INSTALL_DIR:-$HOME/sre-alert-agent}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/sre-alert-agent}"
 DATA_DIR="${DATA_DIR:-$INSTALL_DIR/output}"
 LOG_DIR="${LOG_DIR:-$INSTALL_DIR/output/logs}"
 ENV_FILE="${ENV_FILE:-$HOME/.config/sre-alert-agent.env}"
@@ -204,7 +204,7 @@ if [ ! -d "$DATA_DIR" ]; then
 fi
 
 # Create output subdirectories
-mkdir -p "$DATA_DIR/alerts"/{triage,reviewed,pending,approved,recommendations,sent,ignored}
+mkdir -p "$DATA_DIR/alerts"/{triage,reviewed,pending,approved,rejected,recommendations,sent,ignored}
 mkdir -p "$DATA_DIR/logs"
 log_success "Created output directories"
 
@@ -247,7 +247,8 @@ if [ ! -f "$ENV_FILE" ]; then
     log_info "  - SENTRY_BASE_URL"
     log_info "  - SENTRY_AUTH_TOKEN"
     log_info "  - SENTRY_ORG"
-    log_info "  - DEEPSEEK_API_KEY (or other AI provider)"
+    log_info "  - AI_PROVIDER / AI_MODEL"
+    log_info "  - Provider credentials (for example AZURE_OPENAI_API_KEY)"
     log_info "  - TEAMS_WEBHOOK_URL"
 else
     log_info "Environment file already exists: $ENV_FILE"

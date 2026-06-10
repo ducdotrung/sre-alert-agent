@@ -42,6 +42,23 @@ python3 agents/recommendation_agent.py --config config/agent_config.yaml
 python3 agents/sender.py --config config/agent_config.yaml --dry-run
 ```
 
+## Repo Memory
+
+This repo uses `repo-memory/` as working memory for interrupted sessions and handoffs.
+
+Read this before substantial work:
+
+1. `repo-memory/current-state.md`
+2. relevant files in `repo-memory/workstreams/`
+3. latest file in `repo-memory/handoffs/`
+
+Rules:
+
+- treat `docs/` as durable design and reference material, not as the default source of active task state
+- when `docs/` and implemented code disagree, record the mismatch in `repo-memory/`
+- after meaningful work, update `repo-memory/current-state.md`, the touched workstream file, and a dated handoff note
+- keep memory entries short, factual, and linked to source files instead of duplicating long docs
+
 ## Architecture
 
 ```
@@ -175,31 +192,36 @@ Issues in `output/alerts/pending/` need human review.
 
 ```bash
 # List pending issues
-ls -la output/alerts/pending/
+python3 scripts/review_queue.py list
 
-# View issue details
-cat output/alerts/pending/SENTRY-123.json | jq
+# View one issue
+python3 scripts/review_queue.py show SENTRY-123
 ```
 
 ### Approve for Sending
 
 ```bash
-# Move to approved/ folder
-mv output/alerts/pending/SENTRY-123.json output/alerts/approved/
+# Approve in a structured way
+python3 scripts/review_queue.py approve SENTRY-123 --reviewer your-name --note "Confirmed impact"
 
-# Run recommendation + sender manually
-python3 agents/recommendation_agent.py
-python3 agents/sender.py
+# Then generate/send from the approved queue
+python3 scripts/review_queue.py dispatch --send
 ```
 
 ### Ignore (Suppress)
 
 ```bash
-# Move to ignored/ folder
-mv output/alerts/pending/SENTRY-123.json output/alerts/ignored/
+# Move to ignored/ with an audit record
+python3 scripts/review_queue.py ignore SENTRY-123 --reviewer your-name --note "Known noise"
 
 # Add to ignore_rules.json
 nano config/ignore_rules.json
+```
+
+### Reject (Do Not Send)
+
+```bash
+python3 scripts/review_queue.py reject SENTRY-123 --reviewer your-name --note "Not actionable enough for alerting"
 ```
 
 Add rule:
@@ -253,6 +275,7 @@ output/
 │   ├── reviewed/        # Agent 2 output (JSON)
 │   ├── pending/         # Needs human review (JSON)
 │   ├── approved/        # Auto-approved (JSON)
+│   ├── rejected/        # Human-reviewed, do not send (JSON)
 │   ├── recommendations/ # Agent 3 output (Markdown)
 │   ├── sent/            # Sent to Teams (Markdown + receipts)
 │   └── ignored/         # Manually suppressed (JSON)

@@ -1,0 +1,18 @@
+[Unit]
+Description=SRE Alert Review Web UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sre-alert-agent
+EnvironmentFile=-/etc/sre-alert-agent.env
+ExecStart=/usr/bin/python3 /opt/sre-alert-agent/scripts/review_web.py --config config/agent_config.yaml --host 0.0.0.0 --port 8088
+Restart=on-failure
+RestartSec=5
+User=root
+Group=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
