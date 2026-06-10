@@ -340,7 +340,7 @@ def load_prompt_template(template_name: str, base_dir: Path | None = None) -> st
         FileNotFoundError: If template doesn't exist
     """
     if base_dir is None:
-        # Assume we're in agents/shared/, go up two levels to repo root
+        # Resolve relative to the repo layout when no explicit base dir is provided.
         base_dir = Path(__file__).parent.parent.parent
 
     template_path = base_dir / "prompts" / template_name
