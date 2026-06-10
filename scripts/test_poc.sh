@@ -62,7 +62,33 @@ check_var() {
 log_info "Checking required environment variables..."
 check_var "SENTRY_BASE_URL"
 check_var "SENTRY_AUTH_TOKEN"
-check_var "DEEPSEEK_API_KEY"
+
+AI_PROVIDER="${AI_PROVIDER:-azure-openai-responses}"
+AI_MODEL="${AI_MODEL:-}"
+
+case "$AI_PROVIDER" in
+    azure-openai|azure-openai-chat|azure-openai-responses)
+        check_var "AZURE_OPENAI_API_KEY"
+        check_var "AZURE_OPENAI_BASE_URL"
+        ;;
+    deepseek)
+        check_var "DEEPSEEK_API_KEY"
+        ;;
+    openai)
+        check_var "OPENAI_API_KEY"
+        ;;
+    google|gemini)
+        check_var "GEMINI_API_KEY"
+        ;;
+    *)
+        if [ -z "${AI_API_KEY:-}" ]; then
+            log_warn "AI_PROVIDER=$AI_PROVIDER is set, but no provider-specific key check is defined"
+            log_warn "Set AI_API_KEY or ensure pi can read the provider credentials from your environment"
+        else
+            log_success "AI_API_KEY is set"
+        fi
+        ;;
+esac
 
 if [ $MISSING_VARS -eq 1 ]; then
     log_error "Missing required environment variables"
@@ -77,11 +103,16 @@ log_info "═══════════════════════�
 log_info "Test 1: pi CLI Connection"
 log_info "═══════════════════════════════════════"
 
-if pi --provider deepseek --print "What is 2+2? Reply with just the number." 2>&1 | grep -q "4"; then
-    log_success "pi CLI with DeepSeek is working"
+PI_CMD=(pi --provider "$AI_PROVIDER" --print "What is 2+2? Reply with just the number.")
+if [ -n "$AI_MODEL" ]; then
+    PI_CMD=(pi --provider "$AI_PROVIDER" --model "$AI_MODEL" --print "What is 2+2? Reply with just the number.")
+fi
+
+if "${PI_CMD[@]}" 2>&1 | grep -q "4"; then
+    log_success "pi CLI is working with provider: $AI_PROVIDER"
 else
     log_error "pi CLI test failed"
-    log_info "Check your DEEPSEEK_API_KEY in .env"
+    log_info "Check AI_PROVIDER/AI_MODEL and the matching API credentials in .env"
     exit 1
 fi
 
