@@ -35,11 +35,11 @@ pi --provider deepseek --print "Hello"
 # Run full pipeline
 ./scripts/run_triage.sh
 
-# Or run agents individually
-python3 agents/triage_agent.py --config config/agent_config.yaml
-python3 agents/review_agent.py --config config/agent_config.yaml
-python3 agents/recommendation_agent.py --config config/agent_config.yaml
-python3 agents/sender.py --config config/agent_config.yaml --dry-run
+# Or run stages individually
+python3 -m alert_agent.pipeline.triage --config config/agent_config.yaml
+python3 -m alert_agent.pipeline.review --config config/agent_config.yaml
+python3 -m alert_agent.pipeline.recommendation --config config/agent_config.yaml
+python3 -m alert_agent.pipeline.sender --config config/agent_config.yaml --dry-run
 ```
 
 ## Repo Memory
@@ -373,16 +373,16 @@ class_thresholds:
 
 ```bash
 # Triage only (dry-run, no AI)
-python3 agents/triage_agent.py --dry-run
+python3 -m alert_agent.pipeline.triage --dry-run
 
 # Review only (on existing triage results)
-python3 agents/review_agent.py
+python3 -m alert_agent.pipeline.review
 
 # Recommendations only
-python3 agents/recommendation_agent.py
+python3 -m alert_agent.pipeline.recommendation
 
 # Sender dry-run (print messages, don't send)
-python3 agents/sender.py --dry-run
+python3 -m alert_agent.pipeline.sender --dry-run
 ```
 
 ### View Logs

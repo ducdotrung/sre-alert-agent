@@ -43,7 +43,7 @@ If you are using the Azure helper flow, you can also run:
 ## 3. Run Triage
 
 ```bash
-python3 agents/triage_agent.py --dry-run
+python3 -m alert_agent.pipeline.triage --dry-run
 ./scripts/run_triage.sh --minutes 70
 ```
 
@@ -66,8 +66,8 @@ python3 scripts/review_web.py --host 0.0.0.0 --port 8088
 ## 5. Generate and Preview Notifications
 
 ```bash
-python3 agents/recommendation_agent.py --config config/agent_config.yaml
-python3 agents/sender.py --config config/agent_config.yaml --dry-run
+python3 -m alert_agent.pipeline.recommendation --config config/agent_config.yaml
+python3 -m alert_agent.pipeline.sender --config config/agent_config.yaml --dry-run
 ```
 
 ## 6. Tune Rules With Real Data

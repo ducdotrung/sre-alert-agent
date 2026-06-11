@@ -24,13 +24,13 @@ TEAMS_PENDING_REVIEW_WEBHOOK_URL=https://example.invalid/pending-webhook
 ## 3. Dry-Run the Sender
 
 ```bash
-python3 agents/sender.py --config config/agent_config.yaml --dry-run
+python3 -m alert_agent.pipeline.sender --config config/agent_config.yaml --dry-run
 ```
 
 ## 4. Send for Real
 
 ```bash
-python3 agents/sender.py --config config/agent_config.yaml
+python3 -m alert_agent.pipeline.sender --config config/agent_config.yaml
 ```
 
 ## Notes

@@ -6,7 +6,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 import io
 
-from agents.sender import build_teams_message_card
+from alert_agent.pipeline.sender import build_teams_message_card
 from alert_agent.core.pending_review_notifications import (
     build_pending_review_card,
     load_notification_state,

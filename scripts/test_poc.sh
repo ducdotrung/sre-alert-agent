@@ -143,7 +143,7 @@ log_info "Test 3: Triage Agent (dry-run)"
 log_info "═══════════════════════════════════════"
 
 log_info "Running triage agent (no AI calls)..."
-env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 agents/triage_agent.py --hours 24 --dry-run 2>&1 | tee /tmp/triage-test.log
+env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 -m alert_agent.pipeline.triage --hours 24 --dry-run 2>&1 | tee /tmp/triage-test.log
 TRIAGE_EXIT=$?
 
 TRIAGE_COUNT=$(ls -1 output/alerts/triage/*.json 2>/dev/null | wc -l | tr -d ' ')
@@ -176,7 +176,7 @@ P0_P1_COUNT=$(jq -r 'select(.final.priority == "P0" or .final.priority == "P1") 
 if [ "$P0_P1_COUNT" -gt 0 ]; then
     log_info "Found $P0_P1_COUNT critical issues, running review agent..."
 
-    env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 agents/review_agent.py 2>&1 | tee /tmp/review-test.log
+    env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 -m alert_agent.pipeline.review 2>&1 | tee /tmp/review-test.log
     REVIEW_EXIT=$?
 
     APPROVED_COUNT=$(ls -1 output/alerts/approved/*.json 2>/dev/null | wc -l | tr -d ' ')
@@ -230,7 +230,7 @@ APPROVED_COUNT=$(ls -1 output/alerts/approved/*.json 2>/dev/null | wc -l | tr -d
 if [ "$APPROVED_COUNT" -gt 0 ]; then
     log_info "Found $APPROVED_COUNT approved issues, testing recommendation agent..."
 
-    if env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 agents/recommendation_agent.py 2>&1 | tee /tmp/recommendation-test.log; then
+    if env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 -m alert_agent.pipeline.recommendation 2>&1 | tee /tmp/recommendation-test.log; then
         RECO_COUNT=$(ls -1 output/alerts/recommendations/*.md 2>/dev/null | wc -l | tr -d ' ')
         log_success "Recommendation agent completed: $RECO_COUNT recommendations generated"
 
@@ -259,7 +259,7 @@ RECO_COUNT=$(ls -1 output/alerts/recommendations/*.md 2>/dev/null | wc -l | tr -
 if [ "$RECO_COUNT" -gt 0 ]; then
     log_info "Testing sender (dry-run, will not actually send to Teams)..."
 
-    if env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 agents/sender.py --dry-run 2>&1 | tee /tmp/sender-test.log; then
+    if env $(grep -v '^#' .env | grep -v '^$' | xargs) python3 -m alert_agent.pipeline.sender --dry-run 2>&1 | tee /tmp/sender-test.log; then
         log_success "Sender test completed (dry-run)"
         log_info "Teams message card preview shown above"
     else
@@ -297,7 +297,7 @@ if [ "$APPROVED_COUNT" -gt 0 ]; then
     echo "1. Review approved issues in: output/alerts/approved/"
     echo "2. Review recommendations in: output/alerts/recommendations/"
     echo "3. Test actual Teams sending:"
-    echo "   python3 agents/sender.py"
+    echo "   python3 -m alert_agent.pipeline.sender"
     echo "4. Set up cron for production:"
     echo "   crontab -e"
     echo "   0 * * * * cd $(pwd) && ./scripts/run_triage.sh"
@@ -306,7 +306,7 @@ elif [ "$TRIAGE_COUNT" -gt 0 ]; then
     echo ""
     log_info "This is normal if your Sentry has no recent critical errors."
     log_info "Try with longer lookback:"
-    echo "  python3 agents/triage_agent.py --hours 168  # 7 days"
+    echo "  python3 -m alert_agent.pipeline.triage --hours 168  # 7 days"
 else
     log_warn "No issues found. Check your Sentry configuration."
     log_info "Verify SENTRY_ORG, SENTRY_PROJECTS in .env"

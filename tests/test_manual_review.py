@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from agents.shared.manual_review import ensure_dirs, list_issues, record_action
+from alert_agent.core.manual_review import ensure_dirs, list_issues, record_action
 
 
 def sample_issue() -> dict[str, object]:
@@ -35,17 +34,6 @@ def sample_issue() -> dict[str, object]:
 
 
 class ManualReviewTests(unittest.TestCase):
-    def test_legacy_shared_module_aliases_resolve(self) -> None:
-        from agents.shared import config_loader as agents_config_loader
-        sys.path.insert(0, str(Path("agents").resolve()))
-        try:
-            from shared import config_loader as shared_config_loader
-        finally:
-            sys.path.pop(0)
-
-        self.assertIs(agents_config_loader, shared_config_loader)
-        self.assertTrue(hasattr(agents_config_loader, "get_repo_root"))
-
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         root = Path(self.tempdir.name)

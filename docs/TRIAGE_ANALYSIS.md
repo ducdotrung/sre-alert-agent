@@ -29,5 +29,5 @@ Each run writes a timestamped folder under `output/analysis/` containing:
 
 1. inspect the analysis output
 2. update `config/classification_rules.yaml` or prompt files
-3. rerun `python3 agents/triage_agent.py --dry-run`
+3. rerun `python3 -m alert_agent.pipeline.triage --dry-run`
 4. rerun corpus analysis to compare the result

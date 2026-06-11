@@ -42,7 +42,7 @@ python3 scripts/review_queue.py dispatch --send
 
 1. verify `.env` values are loaded
 2. test Sentry connectivity
-3. run `python3 agents/triage_agent.py --dry-run`
+3. run `python3 -m alert_agent.pipeline.triage --dry-run`
 
 ### Queue is growing but nothing is sent
 
@@ -53,7 +53,7 @@ python3 scripts/review_queue.py dispatch --send
 ### Sender failed
 
 1. check `TEAMS_WEBHOOK_URL`
-2. run `python3 agents/sender.py --config config/agent_config.yaml --dry-run`
+2. run `python3 -m alert_agent.pipeline.sender --config config/agent_config.yaml --dry-run`
 3. inspect the latest markdown in `output/alerts/recommendations/`
 
 ### Review UI is stale

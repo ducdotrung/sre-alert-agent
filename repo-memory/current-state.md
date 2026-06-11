@@ -1,11 +1,12 @@
 # Current State
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 ## Repo Snapshot
 
 - Core Sentry triage pipeline is implemented and runnable through `scripts/run_triage.sh`.
 - The runtime now has a shared pipeline layer in `alert_agent/pipeline/` and a source plugin layer in `alert_agent/sources/`.
+- The legacy `agents/` compatibility wrappers were removed; operational entrypoints now call `alert_agent.pipeline.*` directly.
 - Manual review workflow exists in both CLI and web UI form.
 - Monitoring work is implemented for current scope: usage ledger, budgets, pipeline health, queue health, daily summary, and static dashboard.
 - Self-improvement phase 1 is partially implemented as a read-only proposal generator.

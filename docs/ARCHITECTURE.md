@@ -17,7 +17,6 @@ The system is intentionally file-oriented. Each stage writes artifacts into `out
 - `alert_agent/sources/sentry/`: source plugin for fetching and normalizing Sentry issues
 - `alert_agent/pipeline/`: shared stage implementations for triage, review, recommendation, and sending
 - `alert_agent/core/`: config loading, review queue helpers, Teams delivery, monitoring helpers, and shared models
-- `agents/`: legacy-compatible agent entrypoints
 - `scripts/`: orchestration, review tools, monitoring commands, and analysis utilities
 
 ## End-to-End Flow

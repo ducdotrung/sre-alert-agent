@@ -294,7 +294,7 @@ if [ "$BUDGET_ENFORCEMENT_ACTIVE" = "true" ] && [ "$BUDGET_ENFORCEMENT_MODE" = "
 fi
 
 set +e
-python3 agents/triage_agent.py --config "$CONFIG_FILE" --source "$PIPELINE_SOURCE" $TIME_ARG $TRIAGE_DRY_RUN 2>&1 | tee -a "$LOG_DIR/triage-$(date +%Y%m%d).log"
+python3 -m alert_agent.pipeline.triage --config "$CONFIG_FILE" --source "$PIPELINE_SOURCE" $TIME_ARG $TRIAGE_DRY_RUN 2>&1 | tee -a "$LOG_DIR/triage-$(date +%Y%m%d).log"
 TRIAGE_EXIT=${PIPESTATUS[0]}
 set -e
 
@@ -326,7 +326,7 @@ log_info "AGENT 2: Review (AI assessment)"
 log_info "=========================================="
 
 set +e
-python3 agents/review_agent.py --config "$CONFIG_FILE" 2>&1 | tee -a "$LOG_DIR/review-$(date +%Y%m%d).log"
+python3 -m alert_agent.pipeline.review --config "$CONFIG_FILE" 2>&1 | tee -a "$LOG_DIR/review-$(date +%Y%m%d).log"
 REVIEW_EXIT=${PIPESTATUS[0]}
 set -e
 
@@ -359,7 +359,7 @@ log_info "AGENT 3: Recommendation (AI generation)"
 log_info "=========================================="
 
 set +e
-python3 agents/recommendation_agent.py --config "$CONFIG_FILE" $RECOMMENDATION_DRY_RUN 2>&1 | tee -a "$LOG_DIR/recommendation-$(date +%Y%m%d).log"
+python3 -m alert_agent.pipeline.recommendation --config "$CONFIG_FILE" $RECOMMENDATION_DRY_RUN 2>&1 | tee -a "$LOG_DIR/recommendation-$(date +%Y%m%d).log"
 RECO_EXIT=${PIPESTATUS[0]}
 set -e
 
@@ -386,7 +386,7 @@ log_info "SENDER: Teams Notification"
 log_info "=========================================="
 
 set +e
-python3 agents/sender.py --config "$CONFIG_FILE" 2>&1 | tee -a "$LOG_DIR/sender-$(date +%Y%m%d).log"
+python3 -m alert_agent.pipeline.sender --config "$CONFIG_FILE" 2>&1 | tee -a "$LOG_DIR/sender-$(date +%Y%m%d).log"
 SENDER_EXIT=${PIPESTATUS[0]}
 set -e
 

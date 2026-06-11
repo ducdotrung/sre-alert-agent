@@ -64,8 +64,8 @@ set -a
 source /etc/sre-alert-agent.env
 set +a
 
-python3 agents/triage_agent.py --dry-run
-python3 agents/sender.py --config config/agent_config.yaml --dry-run
+python3 -m alert_agent.pipeline.triage --dry-run
+python3 -m alert_agent.pipeline.sender --config config/agent_config.yaml --dry-run
 ```
 
 ## 5. Optional: Review UI Service
@@ -100,8 +100,8 @@ Use either cron or a scheduler of your choice. See [CRONJOB_SETUP.md](CRONJOB_SE
 ```bash
 cd /opt/sre-alert-agent
 git pull
-python3 agents/triage_agent.py --dry-run
-python3 agents/sender.py --config config/agent_config.yaml --dry-run
+python3 -m alert_agent.pipeline.triage --dry-run
+python3 -m alert_agent.pipeline.sender --config config/agent_config.yaml --dry-run
 ```
 
 If queue files already exist, upgrades are usually safe because the pipeline is file-based and stage artifacts remain on disk.

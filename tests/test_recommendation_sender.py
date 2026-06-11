@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from agents.recommendation_agent import build_markdown_with_frontmatter
-from agents.sender import build_teams_message_card, parse_front_matter
+from alert_agent.pipeline.recommendation import build_markdown_with_frontmatter
+from alert_agent.pipeline.sender import build_teams_message_card, parse_front_matter
 
 
 def approved_issue(manual: bool) -> dict[str, object]:

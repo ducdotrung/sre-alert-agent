@@ -4,7 +4,6 @@ AI-assisted alert triage for Sentry. The repo pulls recent issues, classifies th
 
 ## Repository Layout
 
-- `agents/`: legacy-compatible entrypoints and wrappers
 - `alert_agent/`: shared pipeline, source plugins, monitoring, and core runtime code
 - `config/`: thresholds, ignore rules, and pipeline configuration
 - `prompts/`: model instructions for triage, review, recommendations, and self-improvement
@@ -17,10 +16,10 @@ AI-assisted alert triage for Sentry. The repo pulls recent issues, classifies th
 
 ```bash
 cp .env.example .env
-python3 agents/triage_agent.py --dry-run
+python3 -m alert_agent.pipeline.triage --dry-run
 ./scripts/run_triage.sh --minutes 70
 python3 scripts/review_queue.py list
-python3 agents/sender.py --dry-run
+python3 -m alert_agent.pipeline.sender --dry-run
 ```
 
 The main environment variables are `SENTRY_BASE_URL`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, the AI provider credentials you want to use, and `TEAMS_WEBHOOK_URL` if you want real delivery.

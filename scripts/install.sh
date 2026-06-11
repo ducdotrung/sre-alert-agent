@@ -295,7 +295,7 @@ else
 fi
 
 # Test Python imports
-if python3 -c "import sys; sys.path.insert(0, '$INSTALL_DIR/agents'); from shared.config_loader import get_repo_root" 2>/dev/null; then
+if python3 -c "import sys; sys.path.insert(0, '$INSTALL_DIR'); from alert_agent.core.config_loader import get_repo_root" 2>/dev/null; then
     log_success "Python imports working"
 else
     log_warn "Python imports test failed"
@@ -320,7 +320,7 @@ echo ""
 echo "2. Test the configuration:"
 echo "   cd $INSTALL_DIR"
 echo "   source $ENV_FILE"
-echo "   python3 agents/triage_agent.py --dry-run"
+echo "   python3 -m alert_agent.pipeline.triage --dry-run"
 echo ""
 echo "3. Run a test triage:"
 echo "   ./scripts/run_triage.sh"

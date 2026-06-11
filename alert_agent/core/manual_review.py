@@ -285,14 +285,14 @@ def dispatch_approved(paths: dict[str, Path], config_file: str, *, dry_run: bool
     if approved_count == 0:
         return 0
 
-    recommendation_command = [sys.executable, "agents/recommendation_agent.py", "--config", config_file]
+    recommendation_command = [sys.executable, "-m", "alert_agent.pipeline.recommendation", "--config", config_file]
     if dry_run:
         recommendation_command.append("--dry-run")
     recommendation_exit = run_command(recommendation_command, repo_root)
     if recommendation_exit not in (0, 2):
         return recommendation_exit
 
-    sender_command = [sys.executable, "agents/sender.py", "--config", config_file]
+    sender_command = [sys.executable, "-m", "alert_agent.pipeline.sender", "--config", config_file]
     if dry_run or not send:
         sender_command.append("--dry-run")
     return run_command(sender_command, repo_root)
