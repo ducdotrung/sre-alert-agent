@@ -1,4 +1,4 @@
-# Sentry Alert Agent System - Developer Guide
+# Alert Agent System - Developer Guide
 
 Multi-agent AI-powered system for automated Sentry alert triage and Teams notification.
 
@@ -138,10 +138,10 @@ Sentry API → Triage Agent → Review Agent → Recommendation Agent → Sender
 Main configuration for all agents. Uses environment variable substitution: `${VAR_NAME}` or `${VAR_NAME:default}`.
 
 Edit to:
-- Adjust confidence thresholds
-- Enable/disable AI
-- Change lookback windows
-- Set auto-approval rules
+- Adjust `pipeline.{triage,review,recommendation,sender}` stage settings
+- Configure sources under `sources.*`
+- Select rule/prompt bundles under `policy_packs.*`
+- Change lookback windows, AI settings, and auto-approval rules
 
 ### `config/classification_rules.yaml`
 
@@ -288,17 +288,17 @@ output/
 
 ```cron
 # Run every hour
-0 * * * * cd /opt/sre-alert-agent && ./scripts/run_triage.sh >> output/logs/cron.log 2>&1
+0 * * * * cd /opt/devops-sentry-alert-agent && ./scripts/run_triage.sh >> output/logs/cron.log 2>&1
 ```
 
 ### Custom Schedule
 
 ```cron
 # Every 4 hours
-0 */4 * * * cd /opt/sre-alert-agent && ./scripts/run_triage.sh
+0 */4 * * * cd /opt/devops-sentry-alert-agent && ./scripts/run_triage.sh
 
 # Business hours only (9 AM - 6 PM, Mon-Fri)
-0 9-18 * * 1-5 cd /opt/sre-alert-agent && ./scripts/run_triage.sh
+0 9-18 * * 1-5 cd /opt/devops-sentry-alert-agent && ./scripts/run_triage.sh
 ```
 
 ## Troubleshooting

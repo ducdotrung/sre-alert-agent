@@ -34,6 +34,15 @@ from alert_agent.core.manual_review import (  # noqa: E402
     record_action,
 )
 from alert_agent.core.usage_metrics import filter_records_for_date, iter_month_records, summarize_records  # noqa: E402
+from alert_agent.improvement.collector import read_audit_events  # noqa: E402
+from alert_agent.improvement.measurement import measure_applied_proposal_effect  # noqa: E402
+from alert_agent.improvement.review_state import (  # noqa: E402
+    flatten_proposals as flatten_review_proposals,
+    get_proposal as get_review_proposal,
+    load_improvement_runs as load_review_runs,
+    load_review_state,
+    review_proposal as review_improvement_proposal,
+)
 
 
 STATUSES = ["pending", "approved", "rejected", "ignored"]
@@ -440,7 +449,7 @@ def page_shell(title: str, body: str, message: str = "", error: str = "", active
     <section class="hero">
       <div class="eyebrow">Local Review Console</div>
       <h1>{esc(title)}</h1>
-      <div class="sub">File-first review workflow for assigned review teams. Queue actions write the same JSON and audit log as the CLI, so this stays consistent with the pipeline.</div>
+      <div class="sub">File-first review workflow for assigned teams. Queue actions write the same JSON and audit log as the CLI, so this stays consistent with the workstation pipeline.</div>
       <nav class="nav">{nav_links}</nav>
     </section>
     {banner}
@@ -569,30 +578,14 @@ def load_issue_documents(directory: Path) -> list[dict[str, Any]]:
 
 
 def load_improvement_runs(paths: dict[str, Path]) -> list[dict[str, Any]]:
-    proposals_dir = paths["output_dir"] / "improvement" / "proposals"
-    runs: list[dict[str, Any]] = []
-    if not proposals_dir.exists():
-        return runs
-    for path in sorted(proposals_dir.glob("proposals-*.json"), reverse=True):
-        payload = read_json_file(path)
-        if payload:
-            payload["_path"] = str(path)
-            runs.append(payload)
-    return runs
+    return load_review_runs(paths)
 
 
-def flatten_proposals(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    proposals: list[dict[str, Any]] = []
-    for run in runs:
-        generated_at = run.get("generated_at")
-        for proposal in run.get("proposals", []):
-            if isinstance(proposal, dict):
-                merged = dict(proposal)
-                merged["_generated_at"] = generated_at
-                merged["_bundle_path"] = run.get("_path")
-                proposals.append(merged)
-    proposals.sort(key=lambda item: str(item.get("_generated_at") or ""), reverse=True)
-    return proposals
+def flatten_proposals(
+    runs: list[dict[str, Any]],
+    review_state: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    return flatten_review_proposals(runs, review_state)
 
 
 def summarize_issue_dimensions(issue_sets: list[list[dict[str, Any]]]) -> tuple[Counter[str], Counter[str], Counter[str]]:
@@ -841,7 +834,7 @@ def render_home(paths: dict[str, Path], filters: dict[str, str], message: str = 
         <div class="panel-header">
           <div>
             <h2>Review Queue</h2>
-            <div class="muted">Review lanes for assigned teams. Filters stay file-first and safe to run in a local or hosted deployment.</div>
+            <div class="muted">Review lanes for assigned teams. Filters stay file-first and safe to run on the workstation.</div>
           </div>
           {render_tabs(status, filters, counts)}
         </div>
@@ -1031,7 +1024,7 @@ def render_improvement_filters(filters: dict[str, str]) -> str:
         <input name="project" value="{esc(filters.get('project', ''))}" placeholder="backend">
       </label>
       <label>Status
-        <select name="status">{options(['proposed', 'accepted', 'rejected'], filters.get('status', ''))}</select>
+        <select name="status">{options(['proposed', 'accepted', 'rejected', 'deferred', 'applied', 'superseded'], filters.get('status', ''))}</select>
       </label>
       <label>Risk
         <select name="risk">{options(['low', 'medium', 'high'], filters.get('risk', ''))}</select>
@@ -1065,19 +1058,64 @@ def render_improvements_table(proposals: list[dict[str, Any]]) -> str:
         evidence = proposal.get("evidence", {})
         notes = [str(note) for note in evidence.get("notes", [])[:2]]
         target_files = ", ".join(str(item) for item in proposal.get("target_files", [])[:2])
+        proposal_id = str(proposal.get("proposal_id") or "")
+        detail_href = f"/improvements/{quote_plus(proposal_id)}"
+        reviewed_by = str(proposal.get("reviewer") or "")
+        review_note = str(proposal.get("review_note") or "")
+        row_actions = (
+            f'<form method="post" action="/improvements/action" class="inline-form">'
+            f'<input type="hidden" name="proposal_id" value="{esc(proposal_id)}">'
+            '<input type="hidden" name="reviewer" value="manual">'
+            '<input type="hidden" name="note" value="">'
+            '<button type="submit" name="action" value="accept">Accept</button>'
+            '<button type="submit" name="action" value="defer" class="alt">Defer</button>'
+            '<button type="submit" name="action" value="reject" class="bad">Reject</button>'
+            '</form>'
+        )
         rows.append(
             "<tr>"
-            f"<td><strong>{esc(proposal.get('proposal_id'))}</strong><div class=\"muted\">{esc(proposal.get('summary'))}</div></td>"
+            f"<td><a href=\"{detail_href}\"><strong>{esc(proposal_id)}</strong></a><div class=\"muted\">{esc(proposal.get('summary'))}</div></td>"
             f"<td><span class=\"pill\">{esc(proposal.get('type'))}</span></td>"
             f"<td>{esc(proposal.get('project') or 'all')}</td>"
+            f"<td>{esc(proposal.get('status') or 'proposed')}<div class=\"muted\">{esc(reviewed_by or 'pending review')}</div></td>"
             f"<td>{esc(proposal.get('risk'))}<div class=\"muted\">confidence {esc(proposal.get('confidence'))}</div></td>"
             f"<td>{esc(evidence.get('sample_size'))}<div class=\"muted\">{esc(json.dumps(evidence.get('manual_actions', {}), ensure_ascii=True))}</div></td>"
-            f"<td>{esc(target_files)}<div class=\"muted\">{esc(' | '.join(notes))}</div></td>"
+            f"<td>{esc(target_files)}<div class=\"muted\">{esc(' | '.join(notes) or review_note)}</div>{row_actions}</td>"
             "</tr>"
         )
     return (
         "<table>"
-        "<thead><tr><th>Proposal</th><th>Type</th><th>Project</th><th>Risk</th><th>Evidence</th><th>Targets / Notes</th></tr></thead>"
+        "<thead><tr><th>Proposal</th><th>Type</th><th>Project</th><th>Status</th><th>Risk</th><th>Evidence</th><th>Targets / Notes</th></tr></thead>"
+        "<tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+
+
+def render_applied_impact_table(proposals: list[dict[str, Any]], paths: dict[str, Path]) -> str:
+    applied = [proposal for proposal in proposals if str(proposal.get("status") or "") == "applied"]
+    if not applied:
+        return '<div class="empty">No applied proposals recorded yet.</div>'
+
+    audit_events = read_audit_events(paths)
+    rows: list[str] = []
+    for proposal in applied[:10]:
+        result = measure_applied_proposal_effect(proposal, audit_events)
+        tone = "ok" if result["outcome"] == "reduced" else "warn" if result["outcome"] == "no_change" else "bad"
+        label = "reduced" if result["outcome"] == "reduced" else "no change" if result["outcome"] == "no_change" else "regressed"
+        rows.append(
+            "<tr>"
+            f"<td><a href=\"/improvements/{quote_plus(str(proposal.get('proposal_id') or ''))}\">{esc(proposal.get('proposal_id'))}</a></td>"
+            f"<td>{esc(proposal.get('type'))}</td>"
+            f"<td>{esc(result['before_count'])}</td>"
+            f"<td>{esc(result['after_count'])}</td>"
+            f"<td>{esc(result['delta'])}</td>"
+            f"<td><span class=\"pill {tone}\">{esc(label)}</span></td>"
+            "</tr>"
+        )
+    return (
+        "<table>"
+        "<thead><tr><th>Proposal</th><th>Type</th><th>Before</th><th>After</th><th>Delta</th><th>Effect</th></tr></thead>"
         "<tbody>"
         + "".join(rows)
         + "</tbody></table>"
@@ -1087,7 +1125,7 @@ def render_improvements_table(proposals: list[dict[str, Any]]) -> str:
 def render_improvements(paths: dict[str, Path], message: str = "", error: str = "", filters: dict[str, str] | None = None) -> bytes:
     active_filters = filters or {}
     runs = load_improvement_runs(paths)
-    proposals = flatten_proposals(runs)
+    proposals = flatten_proposals(runs, load_review_state(paths))
     filtered = [proposal for proposal in proposals if proposal_matches_filters(proposal, active_filters)]
 
     type_counts = Counter(str(proposal.get("type") or "unknown") for proposal in proposals)
@@ -1108,6 +1146,17 @@ def render_improvements(paths: dict[str, Path], message: str = "", error: str = 
     ]
 
     body = f"""
+    <section class="panel" style="margin-bottom:1rem;">
+      <div class="panel-header">
+        <div>
+          <h2>Applied Proposal Impact</h2>
+          <div class="muted">Manual-review volume in the 14 days before and after each applied proposal.</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        {render_applied_impact_table(proposals, paths)}
+      </div>
+    </section>
     <div class="panel" style="margin-bottom:1rem;">
       <div class="panel-body">
         <div class="kpi-grid">{kpis}</div>
@@ -1132,6 +1181,129 @@ def render_improvements(paths: dict[str, Path], message: str = "", error: str = 
     </div>
     """
     return page_shell("Improvement Proposals", body, message=message, error=error, active_page="improvements")
+
+
+def render_improvement_detail(paths: dict[str, Path], proposal_id: str, message: str = "", error: str = "") -> bytes:
+    proposal = get_review_proposal(paths, proposal_id)
+    target_files = proposal.get("target_files", [])
+    evidence = proposal.get("evidence", {})
+    related_issue_ids = proposal.get("related_issue_ids", [])
+    review_note = str(proposal.get("review_note") or "")
+
+    related_html = "".join(f'<span class="pill">{esc(item)}</span>' for item in related_issue_ids[:12])
+    target_html = "".join(f'<div class="mono">{esc(item)}</div>' for item in target_files)
+
+    review_event = '<div class="empty">No reviewer decision yet.</div>'
+    if proposal.get("status") in {"accepted", "rejected", "deferred"}:
+        review_event = (
+            '<div class="event">'
+            f"<strong>{esc(proposal.get('status'))} by {esc(proposal.get('reviewer') or 'unknown')}</strong>"
+            f"<div class=\"muted\">{esc(proposal.get('reviewed_at') or '')}</div>"
+            f"<div>{esc(review_note or 'No note provided.')}</div>"
+            "</div>"
+        )
+    if proposal.get("status") == "applied":
+        applied = dict(proposal.get("applied") or {})
+        review_event = (
+            '<div class="event">'
+            f"<strong>applied in {esc(applied.get('commit_sha') or 'unknown')}</strong>"
+            f"<div class=\"muted\">{esc(applied.get('timestamp') or '')}</div>"
+            f"<div>{esc(applied.get('change_summary') or 'No change summary recorded.')}</div>"
+            "</div>"
+        )
+
+    body = f"""
+    <div class="actions" style="margin-bottom:1rem;">
+      <a class="button-link ghost" href="/improvements">Back to proposals</a>
+    </div>
+    <div class="grid">
+      <section class="stack">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>{esc(proposal.get('proposal_id'))}</h2>
+              <div class="muted">{esc(proposal.get('summary'))}</div>
+            </div>
+            <div class="actions">
+              <span class="pill">{esc(proposal.get('type'))}</span>
+              <span class="pill">{esc(proposal.get('status') or 'proposed')}</span>
+            </div>
+          </div>
+          <div class="panel-body stack">
+            <div class="meta-grid">
+              <div class="meta-box"><h3>Project</h3><div>{esc(proposal.get('project') or 'all')}</div></div>
+              <div class="meta-box"><h3>Source</h3><div>{esc(proposal.get('source') or 'unknown')}</div></div>
+              <div class="meta-box"><h3>Risk</h3><div>{esc(proposal.get('risk') or 'n/a')}</div></div>
+              <div class="meta-box"><h3>Confidence</h3><div>{esc(proposal.get('confidence') or 'n/a')}</div></div>
+              <div class="meta-box"><h3>Policy Pack</h3><div>{esc(proposal.get('policy_pack') or 'default')}</div></div>
+              <div class="meta-box"><h3>Generated</h3><div class="mono">{esc(proposal.get('_generated_at') or '')}</div></div>
+            </div>
+            <div class="meta-box">
+              <h3>Target Files</h3>
+              {target_html or '<div class="empty">No target files recorded.</div>'}
+            </div>
+            <div class="meta-box">
+              <h3>Evidence</h3>
+              <pre class="mono">{esc(json.dumps(evidence, indent=2, ensure_ascii=True))}</pre>
+            </div>
+            <div class="meta-box">
+              <h3>Suggested Change</h3>
+              <pre class="mono">{esc(json.dumps(proposal.get('suggested_change', {}), indent=2, ensure_ascii=True))}</pre>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Review Decision</h2>
+              <div class="muted">Review this proposal before any config or prompt change is applied.</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            <form method="post" action="/improvements/action" class="stack">
+              <input type="hidden" name="proposal_id" value="{esc(proposal_id)}">
+              <label>Reviewer
+                <input name="reviewer" value="{esc(proposal.get('reviewer') or 'manual')}">
+              </label>
+              <label>Note
+                <textarea name="note" placeholder="Why this proposal should be accepted, deferred, or rejected">{esc(review_note)}</textarea>
+              </label>
+              <div class="actions">
+                <button type="submit" name="action" value="accept">Accept</button>
+                <button type="submit" name="action" value="defer" class="alt">Defer</button>
+                <button type="submit" name="action" value="reject" class="bad">Reject</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </section>
+      <aside class="stack">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Current Review State</h2>
+              <div class="muted">Latest reviewer decision for this proposal.</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            {review_event}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Related Issues</h2>
+              <div class="muted">Examples used to support the proposal.</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            {related_html or '<div class="empty">No related issue IDs recorded.</div>'}
+          </div>
+        </section>
+      </aside>
+    </div>
+    """
+    return page_shell(f"Improvement {proposal_id}", body, message=message, error=error, active_page="improvements")
 
 
 def render_select(name: str, values: list[str], current: str | None, allow_blank: bool = True) -> str:
@@ -1329,6 +1501,17 @@ class ReviewWebHandler(BaseHTTPRequestHandler):
             self.send_html(content)
             return
 
+        if parsed.path.startswith("/improvements/"):
+            proposal_id = parsed.path.rsplit("/", 1)[-1]
+            try:
+                content = render_improvement_detail(self.server.paths, proposal_id, message=message, error=error)
+            except FileNotFoundError as exc:
+                content = page_shell("Not Found", '<div class="panel"><div class="panel-body empty">Proposal not found.</div></div>', error=str(exc), active_page="improvements")
+                self.send_html(content, status=HTTPStatus.NOT_FOUND)
+                return
+            self.send_html(content)
+            return
+
         if parsed.path.startswith("/issue/"):
             issue_id = parsed.path.rsplit("/", 1)[-1]
             status = query.get("status")
@@ -1380,6 +1563,34 @@ class ReviewWebHandler(BaseHTTPRequestHandler):
                 self.redirect("/?status=approved&message=" + quote_plus(f"Dispatch {mode}"))
             else:
                 self.redirect("/?status=approved&error=" + quote_plus(f"Dispatch failed with exit code {exit_code}"))
+            return
+
+        if parsed.path == "/improvements/action":
+            proposal_id = form.get("proposal_id", "")
+            action = form.get("action", "")
+            status = (
+                "accepted" if action == "accept"
+                else "rejected" if action == "reject"
+                else "deferred" if action == "defer"
+                else ""
+            )
+            if not proposal_id or not status:
+                self.redirect("/improvements?error=" + quote_plus("Invalid proposal action"))
+                return
+            try:
+                review_improvement_proposal(
+                    self.server.paths,
+                    proposal_id=proposal_id,
+                    status=status,
+                    reviewer=form.get("reviewer", "manual") or "manual",
+                    note=form.get("note", ""),
+                )
+                self.redirect(
+                    f"/improvements/{quote_plus(proposal_id)}?message="
+                    + quote_plus(f"{status.title()} {proposal_id}")
+                )
+            except Exception as exc:
+                self.redirect(f"/improvements/{quote_plus(proposal_id)}?error={quote_plus(str(exc))}")
             return
 
         self.redirect("/?error=" + quote_plus("Unsupported action"))

@@ -6,11 +6,10 @@ Last updated: 2026-06-11
 
 - Core Sentry triage pipeline is implemented and runnable through `scripts/run_triage.sh`.
 - The runtime now has a shared pipeline layer in `alert_agent/pipeline/` and a source plugin layer in `alert_agent/sources/`.
-- The legacy `agents/` compatibility wrappers were removed; operational entrypoints now call `alert_agent.pipeline.*` directly.
+- Legacy wrapper entrypoints have been removed; callers now invoke `alert_agent.pipeline.*` modules directly.
 - Manual review workflow exists in both CLI and web UI form.
 - Monitoring work is implemented for current scope: usage ledger, budgets, pipeline health, queue health, daily summary, and static dashboard.
-- Self-improvement phase 1 is partially implemented as a read-only proposal generator.
-- Public-facing cleanup completed for the README, docs, example deployment files, and UI copy; old personal paths, legacy repo names, and internal URLs were removed.
+- Self-improvement proposals now support per-proposal storage, review decisions, patch artifacts, manual apply bookkeeping, and impact measurement.
 
 ## Current Truth By Area
 
@@ -29,23 +28,38 @@ Last updated: 2026-06-11
 
 ### Self-Improvement
 
-- Status: phase 1 read-only pipeline exists
+- Status: proposal loop is implemented through review, patch generation, manual apply tracking, and read-only impact measurement
 - Implemented:
   - collect manual review history
   - analyze repeated patterns
-  - generate proposal bundles
-  - expose proposals in the review web UI
+  - generate one file per proposal plus `latest.json` manifest
+  - persist reviewer decisions on proposal documents
+  - accept, reject, defer, patch, and apply proposals from CLI
+  - review and decide proposals in the web UI
+  - generate unified diff patch artifacts for accepted proposals
+  - track applied proposals and suppress them in future self-improve runs
+  - measure before/after manual-review volume for applied proposals
 - Main code:
   - `alert_agent/commands/run_self_improve.py`
   - `alert_agent/improvement/collector.py`
   - `alert_agent/improvement/analyzer.py`
+  - `alert_agent/improvement/storage.py`
   - `alert_agent/improvement/proposer.py`
+  - `alert_agent/improvement/decisions.py`
+  - `alert_agent/improvement/patcher.py`
+  - `alert_agent/improvement/measurement.py`
+  - `alert_agent/improvement/review_state.py`
+  - `scripts/review_web.py`
+  - `scripts/review_queue.py`
   - `tests/test_self_improve.py`
-- Remaining gap: proposal review lifecycle is not complete yet; proposals can be listed, but there is no full accept/reject/apply workflow
+  - `tests/test_improvement_review_state.py`
+  - `tests/test_improvement_patcher.py`
+  - `tests/test_improvement_measurement.py`
+- Remaining gap: proposal patches are still human-applied only; there is no direct config mutation in-app
 
 ### Multi-Source Architecture
 
-- Status: initial implementation complete for Sentry as the only active source
+- Status: canonical config surface is consolidated; architecture is ready for a real second source
 - Implemented:
   - canonical alert model in `alert_agent/core/models.py`
   - source plugin contract in `alert_agent/core/plugin.py`
@@ -53,15 +67,17 @@ Last updated: 2026-06-11
   - Sentry plugin in `alert_agent/sources/sentry/`
   - shared pipeline stages in `alert_agent/pipeline/`
   - source-aware command entrypoint in `scripts/run_pipeline.py`
-- Current limitation: only the triage stage is truly source-pluggable today; review and recommendation remain shared stages that use source-aware metadata and policy packs
+  - only canonical config sections remain for pipeline stages, sources, and policy packs
+  - callers now execute `python3 -m alert_agent.pipeline.{triage,review,recommendation,sender}` directly
+- Current limitation: only Sentry is implemented as a source plugin today; review and recommendation remain shared stages that use source-aware metadata and policy packs
 
 ## Most Likely Next Build
 
 The next major options are:
 
-1. add proposal review lifecycle for self-improvement
+1. add the second source plugin, likely Grafana, to validate the architecture with a real non-Sentry source
 2. add source filter and source labels to the review UI
-3. add the second source plugin, likely Grafana, to validate the architecture with a real non-Sentry source
+3. fix the Azure/OpenAI review-agent config path so workstation review runs stop falling back to manual-review-only behavior
 
 If the goal is architecture validation, the highest-value next step is implementing one real second source.
 

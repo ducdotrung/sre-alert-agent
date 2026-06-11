@@ -12,6 +12,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from alert_agent.core.manual_review import ACTION_TO_QUEUE, dispatch_approved, ensure_dirs, find_issue, issue_summary, list_issues, load_issue, load_paths, record_action
+from alert_agent.improvement.decisions import record_proposal_applied
+from alert_agent.improvement.patcher import generate_patch_for_proposal
+from alert_agent.improvement.review_state import flatten_proposals, get_proposal, load_improvement_runs, load_review_state, review_proposal
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +45,31 @@ def parse_args() -> argparse.Namespace:
     dispatch_parser = subparsers.add_parser("dispatch", help="Run recommendation and optionally sender for approved issues")
     dispatch_parser.add_argument("--dry-run", action="store_true", help="Run recommendation fallback mode and sender dry-run")
     dispatch_parser.add_argument("--send", action="store_true", help="Send to Teams for real; default is sender dry-run")
+
+    proposals_parser = subparsers.add_parser("proposals", help="Review self-improvement proposals")
+    proposal_subparsers = proposals_parser.add_subparsers(dest="proposal_command", required=True)
+
+    proposal_list = proposal_subparsers.add_parser("list", help="List proposals")
+    proposal_list.add_argument("--status", choices=["proposed", "accepted", "rejected", "deferred", "applied", "superseded"], default=None)
+    proposal_list.add_argument("--limit", type=int, default=20)
+    proposal_list.add_argument("--json", action="store_true", help="Print JSON instead of text")
+
+    proposal_show = proposal_subparsers.add_parser("show", help="Show one proposal")
+    proposal_show.add_argument("proposal_id")
+    proposal_show.add_argument("--json", action="store_true", help="Print full JSON")
+
+    for action in ("accept", "reject", "defer"):
+        proposal_action = proposal_subparsers.add_parser(action, help=f"{action.title()} one proposal")
+        proposal_action.add_argument("proposal_id")
+        proposal_action.add_argument("--reviewer", default="manual", help="Reviewer name for the audit log")
+        proposal_action.add_argument("--note", default="", help="Decision note")
+
+    proposal_patch = proposal_subparsers.add_parser("patch", help="Generate or refresh a patch for an accepted proposal")
+    proposal_patch.add_argument("proposal_id")
+
+    proposal_apply = proposal_subparsers.add_parser("apply", help="Mark an accepted proposal as applied")
+    proposal_apply.add_argument("proposal_id")
+    proposal_apply.add_argument("--commit-sha", required=True, help="Commit SHA that shipped the change")
 
     return parser.parse_args()
 
@@ -115,6 +143,64 @@ def command_dispatch(args: argparse.Namespace, paths: dict[str, Path], config_fi
     return dispatch_approved(paths, config_file, dry_run=args.dry_run, send=args.send)
 
 
+def print_proposal_text(proposal: dict[str, object]) -> None:
+    print(
+        f"{proposal.get('proposal_id')}: {proposal.get('type')} [{proposal.get('status')}] "
+        f"source={proposal.get('source') or 'unknown'} project={proposal.get('project') or 'all'} "
+        f"risk={proposal.get('risk') or 'n/a'}"
+    )
+    print(f"  {proposal.get('summary')}")
+
+
+def command_proposals(args: argparse.Namespace, paths: dict[str, Path]) -> int:
+    if args.proposal_command == "list":
+        proposals = flatten_proposals(load_improvement_runs(paths), load_review_state(paths))
+        if args.status:
+            proposals = [proposal for proposal in proposals if str(proposal.get("status") or "") == args.status]
+        proposals = proposals[: max(args.limit, 0)] if args.limit > 0 else proposals
+        if args.json:
+            print(json.dumps(proposals, indent=2))
+            return 0
+        if not proposals:
+            print("No proposals found")
+            return 0
+        for proposal in proposals:
+            print_proposal_text(proposal)
+        return 0
+
+    if args.proposal_command == "show":
+        proposal = get_proposal(paths, args.proposal_id)
+        print(json.dumps(proposal, indent=2))
+        return 0
+
+    if args.proposal_command == "patch":
+        patch = generate_patch_for_proposal(paths, args.proposal_id, config_file=args.config)
+        print(str(patch))
+        return 0
+
+    if args.proposal_command == "apply":
+        proposal = record_proposal_applied(paths, proposal_id=args.proposal_id, commit_sha=args.commit_sha)
+        print(f"Applied {proposal.get('proposal_id')} in {args.commit_sha}")
+        return 0
+
+    status = {
+        "accept": "accepted",
+        "reject": "rejected",
+        "defer": "deferred",
+    }[str(args.proposal_command)]
+    proposal = review_proposal(
+        paths,
+        proposal_id=args.proposal_id,
+        status=status,
+        reviewer=args.reviewer,
+        note=args.note,
+    )
+    print(f"{status.title()} {proposal.get('proposal_id')} by {args.reviewer}")
+    if args.note:
+        print(f"Note: {args.note}")
+    return 0
+
+
 def main() -> int:
     args = parse_args()
     paths = load_paths(args.config)
@@ -128,6 +214,8 @@ def main() -> int:
         return command_action(args, paths)
     if args.command == "dispatch":
         return command_dispatch(args, paths, args.config)
+    if args.command == "proposals":
+        return command_proposals(args, paths)
     raise ValueError(f"Unsupported command: {args.command}")
 
 

@@ -18,7 +18,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from alert_agent.core.config_loader import load_agent_config
+from alert_agent.core.config_loader import load_agent_config, load_pipeline_stage_config, load_policy_pack, load_source_config
 from alert_agent.core.sentry_client import (
     SentryClient,
     discover_org,
@@ -356,8 +356,9 @@ def main() -> int:
     args = parse_args()
     load_dotenv_if_present(REPO_ROOT / '.env')
 
-    triage_config = load_agent_config('triage_agent', args.config)
-    sentry_config = load_agent_config('sentry', args.config)
+    triage_config = load_pipeline_stage_config('triage', args.config)
+    sentry_config = load_source_config('sentry', args.config)
+    policy_pack = load_policy_pack(str(sentry_config.get('policy_pack') or 'sentry-default'), args.config)
     common_config = load_agent_config('common', args.config)
 
     output_dir = resolve_path(Path(common_config.get('output_dir', './output')))
@@ -366,9 +367,9 @@ def main() -> int:
 
     logger.info("Writing analysis to %s", analysis_dir)
 
-    class_rules = load_classification_rules(REPO_ROOT / triage_config['classification_rules'])
-    priority_thresholds = load_priority_thresholds(REPO_ROOT / triage_config['priority_thresholds'])
-    ignore_rules = load_ignore_rules(REPO_ROOT / triage_config['ignore_rules'])
+    class_rules = load_classification_rules(REPO_ROOT / policy_pack['classification_rules'])
+    priority_thresholds = load_priority_thresholds(REPO_ROOT / policy_pack['priority_thresholds'])
+    ignore_rules = load_ignore_rules(REPO_ROOT / policy_pack['ignore_rules'])
     confidence_config = priority_thresholds.get('confidence', {})
 
     sentry_client = SentryClient(sentry_config['base_url'], sentry_config['auth_token'])

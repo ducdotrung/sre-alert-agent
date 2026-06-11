@@ -340,7 +340,6 @@ def load_prompt_template(template_name: str, base_dir: Path | None = None) -> st
         FileNotFoundError: If template doesn't exist
     """
     if base_dir is None:
-        # Resolve relative to the repo layout when no explicit base dir is provided.
         base_dir = Path(__file__).parent.parent.parent
 
     template_path = base_dir / "prompts" / template_name

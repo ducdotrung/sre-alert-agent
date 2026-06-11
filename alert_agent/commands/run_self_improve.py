@@ -13,6 +13,7 @@ from alert_agent.core.config_loader import load_agent_config
 from alert_agent.improvement.analyzer import analyze_review_cases
 from alert_agent.improvement.collector import build_review_cases, read_audit_events
 from alert_agent.improvement.proposer import build_proposals, write_proposal_bundle
+from alert_agent.improvement.storage import load_all_proposal_files, proposal_identity_key
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -93,11 +94,21 @@ def run(config_file: str, config: dict[str, Any], *, force: bool = False, dry_ru
     cases = build_review_cases(config_file)
     min_cases = int(config.get("min_review_events", 3) or 3)
     patterns = analyze_review_cases(cases, min_cases=min_cases)
+    output_dir = Path(config.get("output_dir", "./output/improvement")) / "proposals"
+    applied_identities = {
+        proposal_identity_key(proposal)
+        for proposal in load_all_proposal_files(output_dir)
+        if str(proposal.get("status") or "") == "applied"
+    }
+    if applied_identities:
+        patterns = [
+            pattern for pattern in patterns
+            if proposal_identity_key({"type": pattern.get("kind"), **pattern}) not in applied_identities
+        ]
     ai_client = build_ai_client(config)
     max_proposals = int(config.get("max_proposals", 12) or 12)
     proposals = build_proposals(patterns[:max_proposals], ai_client=ai_client)
 
-    output_dir = Path(config.get("output_dir", "./output/improvement")) / "proposals"
     if dry_run:
         print(json.dumps({"proposal_count": len(proposals), "proposals": proposals}, indent=2))
     else:

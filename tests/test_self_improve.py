@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
+from alert_agent.commands.run_self_improve import run as run_self_improve
 from alert_agent.improvement.analyzer import analyze_review_cases
 from alert_agent.improvement.proposer import build_proposals, write_proposal_bundle
-from scripts.review_web import flatten_proposals, load_improvement_runs, render_improvements
+from alert_agent.improvement.review_state import review_proposal
+from scripts.review_web import (
+    flatten_proposals,
+    load_improvement_runs,
+    render_improvement_detail,
+    render_improvements,
+)
 
 
 SAMPLE_CASES = [
@@ -155,8 +163,10 @@ class SelfImproveTests(unittest.TestCase):
         proposals = build_proposals(patterns, ai_client=None)
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir) / "output"
-            bundle_path = write_proposal_bundle(output_dir / "improvement" / "proposals", proposals)
-            self.assertTrue(bundle_path.exists())
+            proposal_path = write_proposal_bundle(output_dir / "improvement" / "proposals", proposals)
+            self.assertTrue(proposal_path.exists())
+            manifest = json.loads((output_dir / "improvement" / "proposals" / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(manifest["proposal_ids"]), len(proposals))
 
             paths = {
                 "output_dir": output_dir,
@@ -172,6 +182,160 @@ class SelfImproveTests(unittest.TestCase):
             self.assertTrue(flattened)
             self.assertIn(b"Improvement Proposals", content)
             self.assertIn(b"ignore_rule", content)
+
+    def test_review_web_uses_review_state_and_detail_view(self) -> None:
+        patterns = analyze_review_cases(SAMPLE_CASES, min_cases=2)
+        proposals = build_proposals(patterns, ai_client=None)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "output"
+            write_proposal_bundle(output_dir / "improvement" / "proposals", proposals)
+
+            paths = {
+                "output_dir": output_dir,
+                "metrics_dir": output_dir / "metrics",
+                "alerts_dir": output_dir / "alerts",
+                "audit_log": output_dir / "metrics" / "manual_review_actions.jsonl",
+                "repo_root": Path(tmpdir),
+            }
+            target = proposals[0]["proposal_id"]
+            review_proposal(
+                paths,
+                proposal_id=target,
+                status="accepted",
+                reviewer="danny",
+                note="Safe to land as config-only follow-up",
+            )
+
+            runs = load_improvement_runs(paths)
+            flattened = flatten_proposals(runs, None)
+            listed = render_improvements(paths)
+            detail = render_improvement_detail(paths, target)
+
+            matching = next(item for item in flattened if item["proposal_id"] == target)
+            self.assertEqual(matching["status"], "accepted")
+            self.assertIn(b"accepted", listed)
+            self.assertIn(b"danny", listed)
+            self.assertIn(b"Current Review State", detail)
+            self.assertIn(b"Safe to land as config-only follow-up", detail)
+
+    def test_run_self_improve_skips_patterns_already_marked_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            output_dir = repo_root / "output"
+            metrics_dir = output_dir / "metrics"
+            alerts_dir = output_dir / "alerts"
+            metrics_dir.mkdir(parents=True, exist_ok=True)
+            for status in ("pending", "approved", "rejected", "ignored"):
+                (alerts_dir / status).mkdir(parents=True, exist_ok=True)
+
+            config_path = repo_root / "agent_config.yaml"
+            config_path.write_text(
+                f"""
+common:
+  output_dir: {output_dir}
+  metrics_dir: {metrics_dir}
+self_improve:
+  enabled: true
+  output_dir: {output_dir / "improvement"}
+  min_review_events: 2
+  max_proposals: 12
+  ai:
+    enabled: false
+""",
+                encoding="utf-8",
+            )
+
+            issue_doc = {
+                "source": "sentry",
+                "policy_pack": "sentry-default",
+                "metadata": {
+                    "project": "backend",
+                    "title": "Database timeout",
+                    "count": 22,
+                    "users": 0,
+                },
+                "final": {
+                    "class": "dependency",
+                    "priority": "P1",
+                    "danger": "high",
+                },
+                "review": {"decision": "review", "confidence": 0.8},
+            }
+            (alerts_dir / "ignored" / "BACKEND-1.json").write_text(json.dumps({"issue_id": "BACKEND-1", **issue_doc}, indent=2), encoding="utf-8")
+            (alerts_dir / "ignored" / "BACKEND-2.json").write_text(json.dumps({"issue_id": "BACKEND-2", **issue_doc}, indent=2), encoding="utf-8")
+            audit_events = [
+                {
+                    "timestamp": "2026-06-11T00:00:00+00:00",
+                    "issue_id": "BACKEND-1",
+                    "source": "sentry",
+                    "policy_pack": "sentry-default",
+                    "action": "ignore",
+                    "note": "known noise during nightly backup",
+                    "target_status": "ignored",
+                    "classification": "dependency",
+                    "priority": "P1",
+                    "danger": "high",
+                    "project": "backend",
+                },
+                {
+                    "timestamp": "2026-06-11T00:05:00+00:00",
+                    "issue_id": "BACKEND-2",
+                    "source": "sentry",
+                    "policy_pack": "sentry-default",
+                    "action": "ignore",
+                    "note": "known noise during nightly backup",
+                    "target_status": "ignored",
+                    "classification": "dependency",
+                    "priority": "P1",
+                    "danger": "high",
+                    "project": "backend",
+                },
+            ]
+            (metrics_dir / "manual_review_actions.jsonl").write_text(
+                "\n".join(json.dumps(item) for item in audit_events) + "\n",
+                encoding="utf-8",
+            )
+
+            config = {
+                "enabled": True,
+                "output_dir": str(output_dir / "improvement"),
+                "metrics_dir": str(metrics_dir),
+                "min_review_events": 2,
+                "max_proposals": 12,
+                "ai": {"enabled": False},
+            }
+            first_exit = run_self_improve(str(config_path), config, force=True, dry_run=False)
+            self.assertEqual(first_exit, 2)
+
+            proposal_dir = output_dir / "improvement" / "proposals"
+            proposal_ids = json.loads((proposal_dir / "latest.json").read_text(encoding="utf-8"))["proposal_ids"]
+            from alert_agent.improvement.decisions import record_proposal_applied
+
+            paths = {
+                "output_dir": output_dir,
+                "metrics_dir": metrics_dir,
+                "alerts_dir": alerts_dir,
+                "audit_log": metrics_dir / "manual_review_actions.jsonl",
+                "repo_root": repo_root,
+            }
+            for proposal_id in proposal_ids:
+                review_proposal(
+                    paths,
+                    proposal_id=proposal_id,
+                    status="accepted",
+                    reviewer="tester",
+                    note="landed",
+                )
+                record_proposal_applied(
+                    paths,
+                    proposal_id=proposal_id,
+                    commit_sha="abc1234",
+                )
+
+            second_exit = run_self_improve(str(config_path), config, force=True, dry_run=False)
+            self.assertEqual(second_exit, 0)
+            latest_ids = json.loads((proposal_dir / "latest.json").read_text(encoding="utf-8"))["proposal_ids"]
+            self.assertEqual(latest_ids, [])
 
 
 if __name__ == "__main__":

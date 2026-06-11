@@ -128,7 +128,7 @@ def should_auto_approve(
 
 def run(*, config_file: str, dry_run: bool = False) -> int:
     repo_root = get_repo_root()
-    config = load_pipeline_stage_config('review', config_file, legacy_section='review_agent')
+    config = load_pipeline_stage_config('review', config_file)
     logger.info("=== Review Agent Starting ===")
 
     output_dir = Path(config.get('output_dir', './output'))

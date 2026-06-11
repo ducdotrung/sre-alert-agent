@@ -55,6 +55,8 @@ pipeline:
   triage:
     lookback_hours: 2
     rule_confidence_threshold: 0.7
+  sender:
+    teams_webhook_url: https://example.invalid/webhook
 policy_packs:
   sentry-default:
     name: sentry-default
@@ -74,6 +76,33 @@ policy_packs:
             self.assertEqual(source["policy_pack"], "sentry-default")
             self.assertEqual(stage["lookback_hours"], 2)
             self.assertEqual(pack["classification_rules"], "config/classification_rules.yaml")
+
+    def test_missing_pipeline_stage_raises_clear_key_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "agent_config.yaml")
+            with open(config_path, "w", encoding="utf-8") as handle:
+                handle.write("common: {}\npipeline: {}\n")
+
+            with self.assertRaisesRegex(KeyError, "Pipeline stage 'review' not found"):
+                load_pipeline_stage_config("review", config_path)
+
+    def test_missing_source_raises_clear_key_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "agent_config.yaml")
+            with open(config_path, "w", encoding="utf-8") as handle:
+                handle.write("common: {}\nsources: {}\n")
+
+            with self.assertRaisesRegex(KeyError, "Source 'grafana' not found"):
+                load_source_config("grafana", config_path)
+
+    def test_missing_policy_pack_raises_clear_key_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "agent_config.yaml")
+            with open(config_path, "w", encoding="utf-8") as handle:
+                handle.write("common: {}\npolicy_packs: {}\n")
+
+            with self.assertRaisesRegex(KeyError, "Policy pack 'grafana-default' not found"):
+                load_policy_pack("grafana-default", config_path)
 
 
 if __name__ == "__main__":

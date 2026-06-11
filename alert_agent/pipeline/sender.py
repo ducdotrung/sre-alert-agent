@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from alert_agent.core.config_loader import load_agent_config
+from alert_agent.core.config_loader import load_pipeline_stage_config
 from alert_agent.core.review_links import build_review_issue_url
 from alert_agent.core.teams import send_to_teams
 
@@ -69,7 +69,7 @@ def build_teams_message_card(metadata: dict[str, str], body: str, review_web_bas
     project = metadata.get('project', '')
     danger = metadata.get('danger', '')
     approval_source = metadata.get('approval_source', 'ai_auto')
-    source = (metadata.get('source') or '').strip() or ('sentry' if metadata.get('link') else 'alert')
+    source = metadata.get('source', 'alert')
 
     exec_summary = truncate_text(extract_section(body, 'Executive Summary') or "See details below", 400)
     immediate_action = truncate_text(
@@ -147,7 +147,7 @@ def write_receipt(destination: Path, metadata: dict[str, str], webhook_response:
 
 
 def run(*, config_file: str, dry_run: bool = False) -> int:
-    config = load_agent_config('sender', config_file)
+    config = load_pipeline_stage_config('sender', config_file)
     logger.info("=== Sender Starting ===")
     output_dir = Path(config.get('output_dir', './output'))
     recommendations_dir = output_dir / 'alerts' / 'recommendations'

@@ -14,8 +14,12 @@ Turn the repo from a Sentry-shaped implementation into a shared alert engine tha
 - shared triage, review, recommendation, and sender stages in `alert_agent/pipeline/`
 - Sentry plugin in `alert_agent/sources/sentry/`
 - source-aware entrypoint in `scripts/run_pipeline.py`
-- legacy wrappers removed; shell scripts, tests, and docs now point at `alert_agent.pipeline.*` directly
 - orchestrator can pass `PIPELINE_SOURCE` to triage while still defaulting to `sentry`
+- config surface is consolidated onto `pipeline.*`, `sources.*`, and `policy_packs.*`
+- `alert_agent/core/config_loader.py` no longer falls back to legacy top-level stage or source sections
+- sender now loads `pipeline.sender` like the other shared stages
+- callers now execute `python3 -m alert_agent.pipeline.{triage,review,recommendation,sender}` directly
+- `scripts/run_triage.sh` and `alert_agent/core/manual_review.py` now dispatch those direct module entrypoints instead of wrapper files
 
 ## Remaining Work
 
@@ -28,3 +32,7 @@ Turn the repo from a Sentry-shaped implementation into a shared alert engine tha
 
 - current review and recommendation stages are shared, not source-specific classes
 - that is intentional for now; only add source-specific review or recommendation behavior when a real second source demands it
+- workstation sanity check on 2026-06-11: `scripts/run_pipeline.py --source sentry --triage-dry-run --recommendation-dry-run --sender-dry-run` reached Sentry successfully once run outside the sandbox
+- workstation sanity check on 2026-06-11: `python3 -m alert_agent.pipeline.triage --config config/agent_config.yaml --source sentry --minutes 20 --dry-run` reached Sentry successfully once run outside the sandbox
+- local sanity check on 2026-06-11: `python3 scripts/review_queue.py dispatch --dry-run` succeeded after switching dispatch to direct module calls
+- same workstation pass showed `alert_agent.pipeline.review` still depends on an AI key path that is not currently satisfying `pi` for the configured Azure provider

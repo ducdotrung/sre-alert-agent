@@ -179,7 +179,7 @@ timestamp: {dt.datetime.now(dt.timezone.utc).isoformat()}
 
 def run(*, config_file: str, dry_run: bool = False) -> int:
     repo_root = get_repo_root()
-    config = load_pipeline_stage_config('recommendation', config_file, legacy_section='recommendation_agent')
+    config = load_pipeline_stage_config('recommendation', config_file)
     logger.info("=== Recommendation Agent Starting ===")
 
     output_dir = Path(config.get('output_dir', './output'))

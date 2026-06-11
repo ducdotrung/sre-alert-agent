@@ -6,6 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from alert_agent.core.ai_client import PiAIClient, format_prompt, load_prompt_template
+from alert_agent.improvement.storage import (
+    OPEN_STATUSES,
+    load_all_proposal_files,
+    proposal_identity_key,
+    write_latest_manifest,
+    write_proposal_file,
+)
 
 
 TARGET_FILES = {
@@ -49,15 +56,21 @@ def _suggested_change(pattern: dict[str, Any]) -> dict[str, Any]:
                 "project": case.get("project"),
                 "class": case.get("classification"),
                 "title_contains": case.get("title_signature"),
+                "signature": pattern.get("signature"),
             }
         }
     if kind == "classification_rule":
+        keyword_hint = ""
+        cases = pattern.get("cases", [])
+        if cases:
+            keyword_hint = str(cases[0].get("title_signature") or "")
         return {
             "rule_hint": {
                 "source": pattern.get("source"),
                 "project": pattern.get("project"),
                 "from": pattern.get("source_classification"),
                 "to": pattern.get("target_classification"),
+                "keyword": keyword_hint,
             }
         }
     if kind == "priority_threshold":
@@ -139,27 +152,51 @@ def build_proposals(patterns: list[dict[str, Any]], ai_client: PiAIClient | None
             "project": pattern.get("project"),
             "policy_pack": pattern.get("policy_pack"),
             "classification": pattern.get("classification"),
+            "signature": pattern.get("signature"),
+            "source_classification": pattern.get("source_classification"),
+            "target_classification": pattern.get("target_classification"),
             "priority": pattern.get("priority"),
             "target_files": TARGET_FILES.get(kind, []),
             "suggested_change": _suggested_change(pattern),
             "related_issue_ids": pattern.get("related_issue_ids", []),
             "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "decision": None,
+            "applied": None,
+            "superseded_by": None,
+            "supersedes": None,
         }
         proposals.append(proposal)
     return proposals
 
 
 def write_proposal_bundle(output_dir: Path, proposals: list[dict[str, Any]]) -> Path:
-    """Write one proposal bundle and refresh latest.json."""
+    """Write one file per proposal and refresh latest.json."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    bundle = {
-        "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "proposal_count": len(proposals),
-        "proposals": proposals,
+    generated_at = dt.datetime.now(dt.timezone.utc).isoformat()
+    existing = load_all_proposal_files(output_dir)
+    existing_by_identity = {
+        proposal_identity_key(proposal): proposal
+        for proposal in existing
+        if str(proposal.get("status") or "") in OPEN_STATUSES
     }
-    bundle_path = output_dir / f"proposals-{timestamp}.json"
-    bundle_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
-    latest_path = output_dir / "latest.json"
-    latest_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
-    return bundle_path
+
+    written_ids: list[str] = []
+    first_path: Path | None = None
+    for proposal in proposals:
+        identity = proposal_identity_key(proposal)
+        prior = existing_by_identity.get(identity)
+        if prior is not None:
+            prior["status"] = "superseded"
+            prior["superseded_by"] = proposal["proposal_id"]
+            write_proposal_file(output_dir, prior)
+            proposal["supersedes"] = prior.get("proposal_id")
+        proposal["generated_at"] = generated_at
+        path = write_proposal_file(output_dir, proposal)
+        if first_path is None:
+            first_path = path
+        written_ids.append(str(proposal.get("proposal_id") or ""))
+
+    write_latest_manifest(output_dir, written_ids, generated_at)
+    if first_path is None:
+        first_path = output_dir / "latest.json"
+    return first_path

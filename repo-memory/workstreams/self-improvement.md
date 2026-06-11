@@ -1,6 +1,6 @@
 # Workstream: Self-Improvement
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 ## Goal
 
@@ -12,36 +12,43 @@ Turn manual review outcomes into safe, human-reviewed improvement proposals for 
 
 ## Implemented
 
-- Read-only runner exists in `alert_agent/commands/run_self_improve.py`
+- Runner exists in `alert_agent/commands/run_self_improve.py`
 - Audit events and issue documents are collected in `alert_agent/improvement/collector.py`
 - Pattern analysis exists in `alert_agent/improvement/analyzer.py`
-- Proposal generation and bundle writing exist in `alert_agent/improvement/proposer.py`
-- Review web UI already exposes an `/improvements` page in `scripts/review_web.py`
-- Tests exist in `tests/test_self_improve.py`
+- Proposal generation now writes one file per proposal plus `latest.json` in `alert_agent/improvement/proposer.py`
+- Proposal identity, manifests, and storage helpers live in `alert_agent/improvement/storage.py`
+- Reviewer decisions and applied bookkeeping live in `alert_agent/improvement/{decisions,review_state}.py`
+- Patch generation exists in `alert_agent/improvement/patcher.py`
+- Impact measurement exists in `alert_agent/improvement/measurement.py`
+- CLI proposal workflow now lives in `scripts/review_queue.py proposals ...`
+- Review web UI exposes proposal decision flow plus applied-impact table in `scripts/review_web.py`
+- Tests exist in `tests/test_self_improve.py`, `tests/test_improvement_review_state.py`, `tests/test_improvement_patcher.py`, and `tests/test_improvement_measurement.py`
 
 ## Not Implemented Yet
 
-- proposal decision workflow: accept / reject / defer
-- proposal audit log
-- proposal detail view with reviewer note
-- patch-ready output for accepted proposals
-- command or UI flow to apply accepted proposal content into config or prompts
+- in-app auto-apply of proposal patches into tracked config files
+- proposal voting or multi-reviewer workflow
+- automatic regression-to-new-proposal feedback from measured regressions
 
 ## Current Assessment
 
-The feature is beyond "step 1 planned". Phase 1 read-only proposal generation is already real.
+The feature is now a closed human-reviewed loop for POC scope:
 
-The next meaningful step is not another analyzer pass. The next meaningful step is human handling of generated proposals.
+- detect repeated manual-review patterns
+- write durable proposal files
+- review proposals in CLI or web
+- generate patch-ready diffs
+- mark shipped proposals as applied
+- show before/after volume for applied proposals
 
 ## Recommended Next Slice
 
-1. Add proposal storage conventions beyond `status: proposed`
-2. Add CLI or web actions for proposal review
-3. Persist reviewer decision history for proposals
-4. Generate a focused patch suggestion for accepted proposals
+1. Add direct links to generated `.patch` artifacts in the web detail page
+2. Add lightweight reviewer-facing guidance for `git apply` / `git apply --check`
+3. Promote measurement regressions back into proposal generation only after a real false-positive sample exists
 
 ## Notes
 
-- Keep this work read-only with respect to production config until proposal review is solid.
+- Keep this work read-only with respect to production config until patch output is solid and human-reviewed.
 - Prefer config and prompt changes before Python logic changes.
 - If the roadmap doc and code disagree, trust the code and record the mismatch here.

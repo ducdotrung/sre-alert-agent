@@ -214,7 +214,7 @@ def load_agent_config(agent_name: str, config_file: str = "config/agent_config.y
     Load configuration for a specific agent.
 
     Args:
-        agent_name: Agent name (e.g., "triage_agent")
+        agent_name: Top-level config section name (e.g., "monitor")
         config_file: Config file path (relative to repo root)
 
     Returns:
@@ -236,17 +236,13 @@ def load_agent_config(agent_name: str, config_file: str = "config/agent_config.y
 def load_pipeline_stage_config(
     stage_name: str,
     config_file: str = "config/agent_config.yaml",
-    *,
-    legacy_section: str | None = None,
 ) -> dict[str, Any]:
-    """Load a pipeline stage config from `pipeline.<stage>` with legacy fallback."""
+    """Load a pipeline stage config from `pipeline.<stage>`."""
     full_config = load_full_config(config_file)
     pipeline_config = dict(full_config.get("pipeline", {}) or {})
     stage_config = pipeline_config.get(stage_name)
     if isinstance(stage_config, dict):
         return _merge_common(full_config, stage_config)
-    if legacy_section:
-        return load_agent_config(legacy_section, config_file)
     raise KeyError(f"Pipeline stage '{stage_name}' not found in config file")
 
 
@@ -254,7 +250,7 @@ def load_source_config(
     source_name: str,
     config_file: str = "config/agent_config.yaml",
 ) -> dict[str, Any]:
-    """Load a source definition from `sources.<name>` with legacy fallbacks."""
+    """Load a source definition from `sources.<name>`."""
     full_config = load_full_config(config_file)
     sources = dict(full_config.get("sources", {}) or {})
     source_config = sources.get(source_name)
@@ -266,14 +262,6 @@ def load_source_config(
         merged["policy_pack"] = source_config.get("policy_pack", source_name)
         return merged
 
-    if source_name in full_config:
-        merged = _merge_common(full_config, full_config[source_name])
-        merged["source_name"] = source_name
-        merged["kind"] = source_name
-        merged["enabled"] = True
-        merged["policy_pack"] = f"{source_name}-default"
-        return merged
-
     raise KeyError(f"Source '{source_name}' not found in config file")
 
 
@@ -281,24 +269,10 @@ def load_policy_pack(
     pack_name: str,
     config_file: str = "config/agent_config.yaml",
 ) -> dict[str, Any]:
-    """Load a policy pack, falling back to legacy Sentry paths."""
+    """Load a policy pack from `policy_packs.<name>`."""
     full_config = load_full_config(config_file)
     policy_packs = dict(full_config.get("policy_packs", {}) or {})
     if pack_name in policy_packs:
         return _merge_common(full_config, policy_packs[pack_name])
-
-    if pack_name in {"sentry", "sentry-default"} and "triage_agent" in full_config:
-        triage_config = load_agent_config("triage_agent", config_file)
-        return {
-            "name": pack_name,
-            "classification_rules": triage_config.get("classification_rules"),
-            "priority_thresholds": triage_config.get("priority_thresholds"),
-            "ignore_rules": triage_config.get("ignore_rules"),
-            "prompts": {
-                "triage": "prompts/triage_reclassify.md",
-                "review": "prompts/review_decision.md",
-                "recommendation": "prompts/recommendation_generate.md",
-            },
-        }
 
     raise KeyError(f"Policy pack '{pack_name}' not found in config file")

@@ -60,6 +60,7 @@ class ReviewNotificationTests(unittest.TestCase):
                 "confidence": "0.92",
                 "project": "backend",
                 "danger": "high",
+                "source": "sentry",
                 "link": "https://sentry.example.com/issues/123",
                 "review_status": "approved",
             },

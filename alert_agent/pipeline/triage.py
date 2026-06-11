@@ -324,7 +324,7 @@ def determine_stats_period(config: dict[str, Any], hours: int | None, minutes: i
 
 def build_context(config_file: str, source_name: str) -> tuple[PipelineContext, PolicyPack]:
     repo_root = get_repo_root()
-    stage_config = load_pipeline_stage_config('triage', config_file, legacy_section='triage_agent')
+    stage_config = load_pipeline_stage_config('triage', config_file)
     source_config = load_source_config(source_name, config_file)
     output_dir = Path(stage_config.get('output_dir', './output'))
     metrics_dir = Path(stage_config.get('metrics_dir', './output/metrics'))
