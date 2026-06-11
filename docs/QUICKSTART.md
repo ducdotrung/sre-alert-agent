@@ -31,7 +31,7 @@ If you only want to exercise the pipeline locally, keep sender commands in dry-r
 
 ```bash
 python3 --version
-pi --print "test"
+python3 -m alert_agent.core.ai_client  # validates import chain
 ```
 
 If you are using the Azure helper flow, you can also run:

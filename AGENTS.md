@@ -16,17 +16,14 @@ nano .env
 
 Required variables:
 - `SENTRY_BASE_URL`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`
-- `DEEPSEEK_API_KEY` (or other AI provider)
+- `AI_API_KEY`, `AI_PROVIDER` (defaults to `azure-openai-responses`)
 - `TEAMS_WEBHOOK_URL`
 
 ### 2. Test AI Connection
 
 ```bash
-# Test pi CLI is working
-pi --print "What is 2+2?"
-
-# Test with DeepSeek
-pi --provider deepseek --print "Hello"
+# Test with the configured provider
+python3 -c "from alert_agent.core.ai_client import PiAIClient; print(PiAIClient({'provider':'azure-openai-responses','api_key':'...'}).query('hi'))"
 ```
 
 ### 3. Run Agents
@@ -306,13 +303,13 @@ output/
 ### Issue: AI client fails
 
 ```
-ERROR: pi CLI failed (exit 1): ...
+ERROR: AI client error: ...
 ```
 
 **Fix**:
-1. Test `pi` command: `pi --print "test"`
-2. Check API key: `echo $DEEPSEEK_API_KEY`
-3. Try different provider: `pi --provider google --print "test"`
+1. Check `AI_PROVIDER` and `AI_API_KEY` in `.env`
+2. For Azure OpenAI also check `AZURE_OPENAI_BASE_URL` and `AZURE_OPENAI_DEPLOYMENT_NAME_MAP`
+3. Set `AI_PROVIDER=deepseek` and `DEEPSEEK_API_KEY` to use DeepSeek as a fallback
 
 ### Issue: No issues triaged
 
@@ -423,7 +420,7 @@ All configuration is in Git:
 
 ## TODO (Future Enhancements)
 
-- [ ] Web UI for pending review
+- [ ] Grafana source plugin (second source to validate multi-source architecture)
+- [ ] Source labels and filter in the review UI
 - [ ] Incident history database (similar past incidents)
-- [ ] Feedback loop ("was this helpful?")
 - [ ] Multi-tenant support (multiple Teams channels)

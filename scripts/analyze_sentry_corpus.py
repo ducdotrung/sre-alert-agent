@@ -25,16 +25,17 @@ from alert_agent.core.sentry_client import (
     fetch_issues_paginated,
     resolve_projects,
 )
-from triage_agent import (
+from alert_agent.pipeline.triage import (
+    alert_text,
     assess_danger,
     check_ignore_rules,
     classify_by_rules,
-    issue_text,
     load_classification_rules,
     load_ignore_rules,
     load_priority_thresholds,
     prioritize_by_rules,
 )
+from alert_agent.sources.sentry.normalizer import normalize_sentry_issue
 
 
 logging.basicConfig(
@@ -120,9 +121,9 @@ def safe_int(value: Any) -> int:
         return 0
 
 
-def compute_rule_hits(issue: dict[str, Any], class_rules: dict[str, Any]) -> dict[str, list[str]]:
-    """Return keyword hits by class for one issue."""
-    text = issue_text(issue)
+def compute_rule_hits(alert: Any, class_rules: dict[str, Any]) -> dict[str, list[str]]:
+    """Return keyword hits by class for one alert."""
+    text = alert_text(alert)
     hits_by_class: dict[str, list[str]] = {}
     for class_name, class_data in class_rules.items():
         keywords = class_data.get('keywords', [])
@@ -401,16 +402,17 @@ def main() -> int:
     unknown_term_examples: dict[str, set[str]] = collections.defaultdict(set)
 
     for issue in issues:
-        should_ignore, ignore_reason = check_ignore_rules(issue, ignore_rules)
+        alert = normalize_sentry_issue(issue)
+        should_ignore, ignore_reason = check_ignore_rules(alert, ignore_rules)
         if should_ignore:
             ignored_count += 1
             continue
 
-        rule_class, rule_confidence, rule_reasoning = classify_by_rules(issue, class_rules, confidence_config)
-        priority = prioritize_by_rules(issue, rule_class, priority_thresholds)
+        rule_class, rule_confidence, rule_reasoning = classify_by_rules(alert, class_rules, confidence_config)
+        priority = prioritize_by_rules(alert, rule_class, priority_thresholds)
         count = safe_int(issue.get('count'))
         users = safe_int(issue.get('userCount') or issue.get('users'))
-        hits_by_class = compute_rule_hits(issue, class_rules)
+        hits_by_class = compute_rule_hits(alert, class_rules)
         hit_counts = {class_name: len(hits) for class_name, hits in hits_by_class.items()}
         top_hit_count = max(hit_counts.values()) if hit_counts else 0
 
@@ -435,7 +437,7 @@ def main() -> int:
         analyzed.append(item)
 
         if rule_class == 'unknown':
-            text = issue_text(issue)
+            text = alert_text(alert)
             weight = max(1, min(count, 500))
             for token in extract_candidate_terms(text):
                 unknown_term_weights[token] += weight
