@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sre-alert-review-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sre-alert-review-web
+  template:
+    metadata:
+      labels:
+        app: sre-alert-review-web
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: review-web
+          image: ghcr.io/example/sre-alert-agent:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -lc
+            - python3 scripts/review_web.py --config "${CONFIG_FILE}" --host 0.0.0.0 --port "${REVIEW_WEB_PORT}"
+          envFrom:
+            - configMapRef:
+                name: sre-alert-agent-config
+            - secretRef:
+                name: sre-alert-agent-secrets
+          ports:
+            - containerPort: 8088
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: output
+              mountPath: /app/output
+      volumes:
+        - name: output
+          persistentVolumeClaim:
+            claimName: sre-alert-agent-output

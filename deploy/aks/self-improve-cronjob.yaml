@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sre-alert-self-improve
+spec:
+  schedule: "15 2 * * 1"
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 1000
+          containers:
+            - name: self-improve
+              image: ghcr.io/example/sre-alert-agent:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/bash
+                - -lc
+                - ./scripts/run_self_improve.sh
+              envFrom:
+                - configMapRef:
+                    name: sre-alert-agent-config
+                - secretRef:
+                    name: sre-alert-agent-secrets
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+              volumeMounts:
+                - name: output
+                  mountPath: /app/output
+          volumes:
+            - name: output
+              persistentVolumeClaim:
+                claimName: sre-alert-agent-output

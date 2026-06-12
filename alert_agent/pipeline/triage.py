@@ -159,8 +159,13 @@ def reclassify_with_ai(
         template = prompt_path.read_text(encoding='utf-8')
         prompt = format_prompt(
             template,
+            source=alert.source or 'unknown',
+            source_type=alert.source_type or 'unknown',
             title=alert.title,
+            summary=alert.summary or '',
             project=alert.project or 'unknown',
+            service=alert.service or '',
+            environment=alert.environment or '',
             platform=alert.platform or 'unknown',
             count=alert.count,
             users=alert.affected_users,
@@ -296,7 +301,10 @@ def triage_alert(
         'final': final_result,
         'metadata': {
             'title': alert.title,
+            'summary': alert.summary,
             'project': alert.project,
+            'service': alert.service,
+            'environment': alert.environment,
             'platform': alert.platform,
             'count': alert.count,
             'users': alert.affected_users,

@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-06-11
+Last updated: 2026-06-12
 
 ## Repo Snapshot
 
@@ -8,8 +8,11 @@ Last updated: 2026-06-11
 - The runtime now has a shared pipeline layer in `alert_agent/pipeline/` and a source plugin layer in `alert_agent/sources/`.
 - Legacy wrapper entrypoints have been removed; callers now invoke `alert_agent.pipeline.*` modules directly.
 - Manual review workflow exists in both CLI and web UI form.
+- The review web now supports either `/` or a configured subpath derived from `common.review_web_base_url`.
 - Monitoring work is implemented for current scope: usage ledger, budgets, pipeline health, queue health, daily summary, and static dashboard.
 - Self-improvement proposals now support per-proposal storage, review decisions, patch artifacts, manual apply bookkeeping, and impact measurement.
+- Public-safe container packaging now exists as `Dockerfile` and `requirements.txt`, and Kubernetes examples now exist under both `deploy/aks/` and `deploy/eks/`.
+- Prompt contracts are refreshed and documented in `docs/PROMPT_GUIDE.md`.
 
 ## Current Truth By Area
 
@@ -22,7 +25,7 @@ Last updated: 2026-06-11
 ### Review Tool
 
 - Status: usable now
-- Implemented: CLI review workflow, review web UI, audit history, pending-review notifications, direct review links
+- Implemented: CLI review workflow, review web UI, audit history, pending-review notifications, direct review links, root/subpath routing support
 - Remaining gap: remaining work is mostly ergonomics and deeper review workflows
 - Source of truth: `scripts/review_queue.py`, `scripts/review_web.py`, and this memory folder
 
@@ -66,6 +69,7 @@ Last updated: 2026-06-11
   - built-in registry in `alert_agent/core/registry.py`
   - Sentry plugin in `alert_agent/sources/sentry/`
   - shared pipeline stages in `alert_agent/pipeline/`
+  - normalized source metadata now flows into triage, review, and recommendation prompts
   - source-aware command entrypoint in `scripts/run_pipeline.py`
   - only canonical config sections remain for pipeline stages, sources, and policy packs
   - callers now execute `python3 -m alert_agent.pipeline.{triage,review,recommendation,sender}` directly
@@ -77,7 +81,8 @@ The next major options are:
 
 1. add the second source plugin, likely Grafana, to validate the architecture with a real non-Sentry source
 2. add source filter and source labels to the review UI
-3. fix the Azure/OpenAI review-agent config path so workstation review runs stop falling back to manual-review-only behavior
+3. refine the new `deploy/eks/` package for the exact hackathon AWS environment, or keep using its env-driven render flow for image, hostname, ACM cert, and EFS storage class
+4. fix the Azure/OpenAI review-agent config path so workstation review runs stop falling back to manual-review-only behavior
 
 If the goal is architecture validation, the highest-value next step is implementing one real second source.
 

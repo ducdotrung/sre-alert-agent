@@ -1,0 +1,53 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: sre-alert-review-web-gateway
+  namespace: sre-alert-agent
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - hosts:
+        - alerts.example.com
+      port:
+        name: http
+        number: 80
+        protocol: HTTP
+      tls:
+        httpsRedirect: true
+    - hosts:
+        - alerts.example.com
+      port:
+        name: https-alerts
+        number: 443
+        protocol: HTTPS
+      tls:
+        credentialName: alerts-example-tls
+        mode: SIMPLE
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: sre-alert-review-web
+  namespace: sre-alert-agent
+spec:
+  gateways:
+    - sre-alert-review-web-gateway
+  hosts:
+    - alerts.example.com
+  http:
+    - name: sre-alert-review-web
+      headers:
+        request:
+          set:
+            x-forwarded-port: "443"
+            x-forwarded-proto: https
+      match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: sre-alert-review-web
+            port:
+              number: 8088

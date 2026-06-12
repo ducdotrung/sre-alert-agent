@@ -1,0 +1,16 @@
+.git
+.gitignore
+.agents
+.codex
+.env
+.env.*
+!.env.example
+output/
+repo-memory/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+.DS_Store
+.vscode/
+.idea/

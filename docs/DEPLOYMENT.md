@@ -2,6 +2,15 @@
 
 This repo can run on a single Linux host with Python, `jq`, and the `pi` CLI available.
 
+## Kubernetes Packaging
+
+The repo now includes two Kubernetes packaging examples:
+
+- `deploy/eks/README.md`: AWS/EKS path with ECR, EFS-style RWX storage, and standard `Ingress`
+- `deploy/aks/README.md`: AKS reference path kept for Azure-based environments
+
+For AWS usage, the intended starting point is `deploy/eks/`.
+
 ## Suggested Layout
 
 ```text

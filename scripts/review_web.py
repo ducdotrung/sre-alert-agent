@@ -63,7 +63,46 @@ def esc(value: object) -> str:
     return html.escape("" if value is None else str(value))
 
 
-def page_shell(title: str, body: str, message: str = "", error: str = "", active_page: str = "queue") -> bytes:
+def normalize_path_prefix(base_url: str | None) -> str:
+    raw = str(base_url or "").strip()
+    if not raw:
+        return ""
+
+    parsed = urlparse(raw)
+    path = parsed.path if (parsed.scheme or parsed.netloc) else raw
+    trimmed = path.strip().strip("/")
+    if not trimmed:
+        return ""
+    return f"/{trimmed}"
+
+
+def app_path(path_prefix: str, path: str = "/") -> str:
+    normalized_path = "/" if not path or path == "/" else f"/{path.lstrip('/')}"
+    if not path_prefix:
+        return normalized_path
+    if normalized_path == "/":
+        return f"{path_prefix}/"
+    return f"{path_prefix}{normalized_path}"
+
+
+def strip_path_prefix(request_path: str, path_prefix: str) -> str | None:
+    if not path_prefix:
+        return request_path
+    if request_path == path_prefix or request_path == f"{path_prefix}/":
+        return "/"
+    if request_path.startswith(f"{path_prefix}/"):
+        return request_path[len(path_prefix):]
+    return None
+
+
+def resolve_request_path(request_path: str, configured_path_prefix: str) -> tuple[str, str | None]:
+    stripped = strip_path_prefix(request_path, configured_path_prefix)
+    if stripped is not None:
+        return configured_path_prefix, stripped
+    return "", request_path
+
+
+def page_shell(title: str, body: str, path_prefix: str = "", message: str = "", error: str = "", active_page: str = "queue") -> bytes:
     banner = ""
     if message:
         banner += f'<div class="banner ok">{esc(message)}</div>'
@@ -71,9 +110,9 @@ def page_shell(title: str, body: str, message: str = "", error: str = "", active
         banner += f'<div class="banner err">{esc(error)}</div>'
 
     nav_items = [
-        ("queue", "/", "Review Queue"),
-        ("metrics", "/metrics", "Metrics"),
-        ("improvements", "/improvements", "Improvements"),
+        ("queue", app_path(path_prefix, "/"), "Review Queue"),
+        ("metrics", app_path(path_prefix, "/metrics"), "Metrics"),
+        ("improvements", app_path(path_prefix, "/improvements"), "Improvements"),
     ]
     nav_links = "".join(
         f'<a class="nav-link{" active" if name == active_page else ""}" href="{href}">{esc(label)}</a>'
@@ -719,18 +758,18 @@ def build_metrics_snapshot(paths: dict[str, Path], config_file: str) -> dict[str
     }
 
 
-def render_tabs(active_status: str, filters: dict[str, str], counts: dict[str, int]) -> str:
+def render_tabs(active_status: str, filters: dict[str, str], counts: dict[str, int], path_prefix: str = "") -> str:
     links: list[str] = []
     for status in STATUSES:
         query = dict(filters)
         query["status"] = status
-        href = "/?" + urlencode(query)
+        href = app_path(path_prefix, "/") + "?" + urlencode(query)
         classes = "tab active" if status == active_status else "tab"
         links.append(f'<a class="{classes}" href="{href}">{esc(status.title())} ({counts[status]})</a>')
     return '<div class="tabs">' + "".join(links) + "</div>"
 
 
-def render_filter_toolbar(filters: dict[str, str], projects: list[str], teams: list[str]) -> str:
+def render_filter_toolbar(filters: dict[str, str], projects: list[str], teams: list[str], path_prefix: str = "") -> str:
     def select_options(current: str, values: list[str], label_all: str = "all") -> str:
         options = [f'<option value="">{esc(label_all)}</option>']
         for value in values:
@@ -760,13 +799,13 @@ def render_filter_toolbar(filters: dict[str, str], projects: list[str], teams: l
       </label>
       <div class="actions">
         <button type="submit" class="ghost">Apply Filters</button>
-        <a class="button-link ghost" href="/">Reset</a>
+        <a class="button-link ghost" href="{app_path(path_prefix, '/')}">Reset</a>
       </div>
     </form>
     """
 
 
-def render_queue_table(status: str, summaries: list[dict[str, object]], filters: dict[str, str]) -> str:
+def render_queue_table(status: str, summaries: list[dict[str, object]], filters: dict[str, str], path_prefix: str = "") -> str:
     if not summaries:
         return '<div class="empty">No issues match the current filters.</div>'
 
@@ -775,7 +814,7 @@ def render_queue_table(status: str, summaries: list[dict[str, object]], filters:
         issue_id = str(summary["issue_id"])
         priority = str(summary["priority"] or "")
         query = urlencode({"status": status})
-        detail_href = f"/issue/{issue_id}?{query}"
+        detail_href = app_path(path_prefix, f"/issue/{issue_id}") + f"?{query}"
         rows.append(
             "<tr>"
             f'<td><a href="{detail_href}"><strong>{esc(issue_id)}</strong></a><div class="muted">{esc(summary["title"])}</div></td>'
@@ -811,7 +850,7 @@ def render_recent_events(events: list[dict[str, object]]) -> str:
     return '<div class="stack">' + "".join(blocks) + "</div>"
 
 
-def render_home(paths: dict[str, Path], filters: dict[str, str], message: str = "", error: str = "") -> bytes:
+def render_home(paths: dict[str, Path], filters: dict[str, str], path_prefix: str = "", message: str = "", error: str = "") -> bytes:
     status = filters.get("status") or "pending"
     counts = queue_counts(paths)
     statuses_for_discovery = [list_issues(paths, item, limit=200) for item in STATUSES]
@@ -836,21 +875,21 @@ def render_home(paths: dict[str, Path], filters: dict[str, str], message: str = 
             <h2>Review Queue</h2>
             <div class="muted">Review lanes for assigned teams. Filters stay file-first and safe to run on the workstation.</div>
           </div>
-          {render_tabs(status, filters, counts)}
+          {render_tabs(status, filters, counts, path_prefix)}
         </div>
         <div class="panel-body">
-          {render_filter_toolbar(filters, projects, teams)}
+          {render_filter_toolbar(filters, projects, teams, path_prefix)}
           <div class="actions" style="margin-bottom:1rem;">
-            <form method="post" action="/dispatch">
+            <form method="post" action="{app_path(path_prefix, '/dispatch')}">
               <input type="hidden" name="send" value="0">
               <button type="submit" class="alt">Dispatch Approved Dry Run</button>
             </form>
-            <form method="post" action="/dispatch">
+            <form method="post" action="{app_path(path_prefix, '/dispatch')}">
               <input type="hidden" name="send" value="1">
               <button type="submit">Dispatch Approved To Teams</button>
             </form>
           </div>
-          {render_queue_table(status, summaries, filters)}
+          {render_queue_table(status, summaries, filters, path_prefix)}
         </div>
       </section>
       <aside class="panel">
@@ -866,10 +905,10 @@ def render_home(paths: dict[str, Path], filters: dict[str, str], message: str = 
       </aside>
     </div>
     """
-    return page_shell("Review Queue", body, message=message, error=error, active_page="queue")
+    return page_shell("Review Queue", body, path_prefix=path_prefix, message=message, error=error, active_page="queue")
 
 
-def render_metrics(paths: dict[str, Path], config_file: str, message: str = "", error: str = "") -> bytes:
+def render_metrics(paths: dict[str, Path], config_file: str, path_prefix: str = "", message: str = "", error: str = "") -> bytes:
     snapshot = build_metrics_snapshot(paths, config_file)
     pipeline_state = snapshot["pipeline_state"]
     queue_summary = snapshot["queue_summary"]
@@ -1004,10 +1043,10 @@ def render_metrics(paths: dict[str, Path], config_file: str, message: str = "", 
       </aside>
     </div>
     """
-    return page_shell("Operations Metrics", body, message=message, error=error, active_page="metrics")
+    return page_shell("Operations Metrics", body, path_prefix=path_prefix, message=message, error=error, active_page="metrics")
 
 
-def render_improvement_filters(filters: dict[str, str]) -> str:
+def render_improvement_filters(filters: dict[str, str], path_prefix: str = "") -> str:
     def options(values: list[str], current: str) -> str:
         rendered = ['<option value="">all</option>']
         for value in values:
@@ -1031,7 +1070,7 @@ def render_improvement_filters(filters: dict[str, str]) -> str:
       </label>
       <div class="actions">
         <button type="submit" class="ghost">Apply Filters</button>
-        <a class="button-link ghost" href="/improvements">Reset</a>
+        <a class="button-link ghost" href="{app_path(path_prefix, '/improvements')}">Reset</a>
       </div>
     </form>
     """
@@ -1049,7 +1088,7 @@ def proposal_matches_filters(proposal: dict[str, Any], filters: dict[str, str]) 
     return True
 
 
-def render_improvements_table(proposals: list[dict[str, Any]]) -> str:
+def render_improvements_table(proposals: list[dict[str, Any]], path_prefix: str = "") -> str:
     if not proposals:
         return '<div class="empty">No improvement proposals available for the current filters.</div>'
 
@@ -1059,11 +1098,11 @@ def render_improvements_table(proposals: list[dict[str, Any]]) -> str:
         notes = [str(note) for note in evidence.get("notes", [])[:2]]
         target_files = ", ".join(str(item) for item in proposal.get("target_files", [])[:2])
         proposal_id = str(proposal.get("proposal_id") or "")
-        detail_href = f"/improvements/{quote_plus(proposal_id)}"
+        detail_href = app_path(path_prefix, f"/improvements/{quote_plus(proposal_id)}")
         reviewed_by = str(proposal.get("reviewer") or "")
         review_note = str(proposal.get("review_note") or "")
         row_actions = (
-            f'<form method="post" action="/improvements/action" class="inline-form">'
+            f'<form method="post" action="{app_path(path_prefix, "/improvements/action")}" class="inline-form">'
             f'<input type="hidden" name="proposal_id" value="{esc(proposal_id)}">'
             '<input type="hidden" name="reviewer" value="manual">'
             '<input type="hidden" name="note" value="">'
@@ -1092,7 +1131,7 @@ def render_improvements_table(proposals: list[dict[str, Any]]) -> str:
     )
 
 
-def render_applied_impact_table(proposals: list[dict[str, Any]], paths: dict[str, Path]) -> str:
+def render_applied_impact_table(proposals: list[dict[str, Any]], paths: dict[str, Path], path_prefix: str = "") -> str:
     applied = [proposal for proposal in proposals if str(proposal.get("status") or "") == "applied"]
     if not applied:
         return '<div class="empty">No applied proposals recorded yet.</div>'
@@ -1103,9 +1142,10 @@ def render_applied_impact_table(proposals: list[dict[str, Any]], paths: dict[str
         result = measure_applied_proposal_effect(proposal, audit_events)
         tone = "ok" if result["outcome"] == "reduced" else "warn" if result["outcome"] == "no_change" else "bad"
         label = "reduced" if result["outcome"] == "reduced" else "no change" if result["outcome"] == "no_change" else "regressed"
+        proposal_href = app_path(path_prefix, f"/improvements/{quote_plus(str(proposal.get('proposal_id') or ''))}")
         rows.append(
             "<tr>"
-            f"<td><a href=\"/improvements/{quote_plus(str(proposal.get('proposal_id') or ''))}\">{esc(proposal.get('proposal_id'))}</a></td>"
+            f"<td><a href=\"{proposal_href}\">{esc(proposal.get('proposal_id'))}</a></td>"
             f"<td>{esc(proposal.get('type'))}</td>"
             f"<td>{esc(result['before_count'])}</td>"
             f"<td>{esc(result['after_count'])}</td>"
@@ -1122,7 +1162,7 @@ def render_applied_impact_table(proposals: list[dict[str, Any]], paths: dict[str
     )
 
 
-def render_improvements(paths: dict[str, Path], message: str = "", error: str = "", filters: dict[str, str] | None = None) -> bytes:
+def render_improvements(paths: dict[str, Path], path_prefix: str = "", message: str = "", error: str = "", filters: dict[str, str] | None = None) -> bytes:
     active_filters = filters or {}
     runs = load_improvement_runs(paths)
     proposals = flatten_proposals(runs, load_review_state(paths))
@@ -1154,7 +1194,7 @@ def render_improvements(paths: dict[str, Path], message: str = "", error: str = 
         </div>
       </div>
       <div class="panel-body">
-        {render_applied_impact_table(proposals, paths)}
+        {render_applied_impact_table(proposals, paths, path_prefix)}
       </div>
     </section>
     <div class="panel" style="margin-bottom:1rem;">
@@ -1171,8 +1211,8 @@ def render_improvements(paths: dict[str, Path], message: str = "", error: str = 
           </div>
         </div>
         <div class="panel-body">
-          {render_improvement_filters(active_filters)}
-          {render_improvements_table(filtered)}
+          {render_improvement_filters(active_filters, path_prefix)}
+          {render_improvements_table(filtered, path_prefix)}
         </div>
       </section>
       <aside class="stack">
@@ -1180,10 +1220,10 @@ def render_improvements(paths: dict[str, Path], message: str = "", error: str = 
       </aside>
     </div>
     """
-    return page_shell("Improvement Proposals", body, message=message, error=error, active_page="improvements")
+    return page_shell("Improvement Proposals", body, path_prefix=path_prefix, message=message, error=error, active_page="improvements")
 
 
-def render_improvement_detail(paths: dict[str, Path], proposal_id: str, message: str = "", error: str = "") -> bytes:
+def render_improvement_detail(paths: dict[str, Path], proposal_id: str, path_prefix: str = "", message: str = "", error: str = "") -> bytes:
     proposal = get_review_proposal(paths, proposal_id)
     target_files = proposal.get("target_files", [])
     evidence = proposal.get("evidence", {})
@@ -1214,7 +1254,7 @@ def render_improvement_detail(paths: dict[str, Path], proposal_id: str, message:
 
     body = f"""
     <div class="actions" style="margin-bottom:1rem;">
-      <a class="button-link ghost" href="/improvements">Back to proposals</a>
+      <a class="button-link ghost" href="{app_path(path_prefix, '/improvements')}">Back to proposals</a>
     </div>
     <div class="grid">
       <section class="stack">
@@ -1260,7 +1300,7 @@ def render_improvement_detail(paths: dict[str, Path], proposal_id: str, message:
             </div>
           </div>
           <div class="panel-body">
-            <form method="post" action="/improvements/action" class="stack">
+            <form method="post" action="{app_path(path_prefix, '/improvements/action')}" class="stack">
               <input type="hidden" name="proposal_id" value="{esc(proposal_id)}">
               <label>Reviewer
                 <input name="reviewer" value="{esc(proposal.get('reviewer') or 'manual')}">
@@ -1303,7 +1343,7 @@ def render_improvement_detail(paths: dict[str, Path], proposal_id: str, message:
       </aside>
     </div>
     """
-    return page_shell(f"Improvement {proposal_id}", body, message=message, error=error, active_page="improvements")
+    return page_shell(f"Improvement {proposal_id}", body, path_prefix=path_prefix, message=message, error=error, active_page="improvements")
 
 
 def render_select(name: str, values: list[str], current: str | None, allow_blank: bool = True) -> str:
@@ -1316,7 +1356,7 @@ def render_select(name: str, values: list[str], current: str | None, allow_blank
     return f'<select name="{esc(name)}">{"".join(options)}</select>'
 
 
-def render_issue_detail(paths: dict[str, Path], issue_id: str, status: str | None, message: str = "", error: str = "") -> bytes:
+def render_issue_detail(paths: dict[str, Path], issue_id: str, status: str | None, path_prefix: str = "", message: str = "", error: str = "") -> bytes:
     resolved_status, path = find_issue(paths, issue_id, status)
     issue = load_issue(path)
     summary = issue_summary(issue, resolved_status)
@@ -1334,7 +1374,7 @@ def render_issue_detail(paths: dict[str, Path], issue_id: str, status: str | Non
             </div>
           </div>
           <div class="panel-body">
-            <form method="post" action="/action" class="stack">
+            <form method="post" action="{app_path(path_prefix, '/action')}" class="stack">
               <input type="hidden" name="issue_id" value="{esc(issue_id)}">
               <input type="hidden" name="status" value="{esc(resolved_status)}">
               <label>Reviewer
@@ -1376,7 +1416,7 @@ def render_issue_detail(paths: dict[str, Path], issue_id: str, status: str | Non
 
     body = f"""
     <div class="actions" style="margin-bottom:1rem;">
-      <a class="button-link ghost" href="/?status={esc(resolved_status)}">Back to {esc(resolved_status)}</a>
+      <a class="button-link ghost" href="{app_path(path_prefix, '/')}?status={esc(resolved_status)}">Back to {esc(resolved_status)}</a>
       <a class="button-link alt" href="{esc(metadata.get('link', '#'))}" target="_blank" rel="noreferrer">Open in Sentry</a>
     </div>
     <div class="grid">
@@ -1441,7 +1481,7 @@ def render_issue_detail(paths: dict[str, Path], issue_id: str, status: str | Non
       </aside>
     </div>
     """
-    return page_shell(f"Issue {issue_id}", body, message=message, error=error, active_page="queue")
+    return page_shell(f"Issue {issue_id}", body, path_prefix=path_prefix, message=message, error=error, active_page="queue")
 
 
 class ReviewWebHandler(BaseHTTPRequestHandler):
@@ -1470,73 +1510,75 @@ class ReviewWebHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        request_prefix, app_request_path = resolve_request_path(parsed.path, self.server.path_prefix)
         query = {key: values[-1] for key, values in parse_qs(parsed.query).items() if values}
         message = query.get("message", "")
         error = query.get("error", "")
 
-        if parsed.path == "/":
+        if app_request_path == "/":
             filters = {
                 "status": query.get("status", "pending"),
                 "project": query.get("project", ""),
                 "priority": query.get("priority", ""),
                 "team": query.get("team", ""),
             }
-            content = render_home(self.server.paths, filters, message=message, error=error)
+            content = render_home(self.server.paths, filters, request_prefix, message=message, error=error)
             self.send_html(content)
             return
 
-        if parsed.path == "/metrics":
-            content = render_metrics(self.server.paths, self.server.config_file, message=message, error=error)
+        if app_request_path == "/metrics":
+            content = render_metrics(self.server.paths, self.server.config_file, request_prefix, message=message, error=error)
             self.send_html(content)
             return
 
-        if parsed.path == "/improvements":
+        if app_request_path == "/improvements":
             filters = {
                 "type": query.get("type", ""),
                 "project": query.get("project", ""),
                 "status": query.get("status", ""),
                 "risk": query.get("risk", ""),
             }
-            content = render_improvements(self.server.paths, message=message, error=error, filters=filters)
+            content = render_improvements(self.server.paths, request_prefix, message=message, error=error, filters=filters)
             self.send_html(content)
             return
 
-        if parsed.path.startswith("/improvements/"):
-            proposal_id = parsed.path.rsplit("/", 1)[-1]
+        if app_request_path and app_request_path.startswith("/improvements/"):
+            proposal_id = app_request_path.rsplit("/", 1)[-1]
             try:
-                content = render_improvement_detail(self.server.paths, proposal_id, message=message, error=error)
+                content = render_improvement_detail(self.server.paths, proposal_id, request_prefix, message=message, error=error)
             except FileNotFoundError as exc:
-                content = page_shell("Not Found", '<div class="panel"><div class="panel-body empty">Proposal not found.</div></div>', error=str(exc), active_page="improvements")
+                content = page_shell("Not Found", '<div class="panel"><div class="panel-body empty">Proposal not found.</div></div>', path_prefix=request_prefix, error=str(exc), active_page="improvements")
                 self.send_html(content, status=HTTPStatus.NOT_FOUND)
                 return
             self.send_html(content)
             return
 
-        if parsed.path.startswith("/issue/"):
-            issue_id = parsed.path.rsplit("/", 1)[-1]
+        if app_request_path and app_request_path.startswith("/issue/"):
+            issue_id = app_request_path.rsplit("/", 1)[-1]
             status = query.get("status")
             try:
-                content = render_issue_detail(self.server.paths, issue_id, status, message=message, error=error)
+                content = render_issue_detail(self.server.paths, issue_id, status, request_prefix, message=message, error=error)
             except FileNotFoundError as exc:
-                content = page_shell("Not Found", '<div class="panel"><div class="panel-body empty">Issue not found.</div></div>', error=str(exc), active_page="queue")
+                content = page_shell("Not Found", '<div class="panel"><div class="panel-body empty">Issue not found.</div></div>', path_prefix=request_prefix, error=str(exc), active_page="queue")
                 self.send_html(content, status=HTTPStatus.NOT_FOUND)
                 return
             self.send_html(content)
             return
 
-        content = page_shell("Not Found", '<div class="panel"><div class="panel-body empty">Page not found.</div></div>', active_page="queue")
+        content = page_shell("Not Found", '<div class="panel"><div class="panel-body empty">Page not found.</div></div>', path_prefix=request_prefix, active_page="queue")
         self.send_html(content, status=HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        request_prefix, app_request_path = resolve_request_path(parsed.path, self.server.path_prefix)
         form = self.parse_form()
 
-        if parsed.path == "/action":
+        if app_request_path == "/action":
             issue_id = form.get("issue_id", "")
             status = form.get("status", "pending")
             action = form.get("action", "")
             if action not in ACTION_TO_QUEUE:
-                self.redirect(f"/issue/{issue_id}?status={status}&error={quote_plus('Invalid action')}")
+                self.redirect(app_path(request_prefix, f"/issue/{issue_id}") + f"?status={status}&error={quote_plus('Invalid action')}")
                 return
             try:
                 record_action(
@@ -1550,22 +1592,22 @@ class ReviewWebHandler(BaseHTTPRequestHandler):
                     danger=form.get("danger") or None,
                 )
                 target_status = ACTION_TO_QUEUE[action]
-                self.redirect(f"/?status={target_status}&message={quote_plus(f'{action.title()}d {issue_id}')}")
+                self.redirect(app_path(request_prefix, "/") + f"?status={target_status}&message={quote_plus(f'{action.title()}d {issue_id}')}")
             except Exception as exc:
-                self.redirect(f"/issue/{issue_id}?status={status}&error={quote_plus(str(exc))}")
+                self.redirect(app_path(request_prefix, f"/issue/{issue_id}") + f"?status={status}&error={quote_plus(str(exc))}")
             return
 
-        if parsed.path == "/dispatch":
+        if app_request_path == "/dispatch":
             send = form.get("send", "0") == "1"
             exit_code = dispatch_approved(self.server.paths, self.server.config_file, dry_run=not send, send=send)
             if exit_code == 0:
                 mode = "sent to Teams" if send else "dry-run complete"
-                self.redirect("/?status=approved&message=" + quote_plus(f"Dispatch {mode}"))
+                self.redirect(app_path(request_prefix, "/") + "?status=approved&message=" + quote_plus(f"Dispatch {mode}"))
             else:
-                self.redirect("/?status=approved&error=" + quote_plus(f"Dispatch failed with exit code {exit_code}"))
+                self.redirect(app_path(request_prefix, "/") + "?status=approved&error=" + quote_plus(f"Dispatch failed with exit code {exit_code}"))
             return
 
-        if parsed.path == "/improvements/action":
+        if app_request_path == "/improvements/action":
             proposal_id = form.get("proposal_id", "")
             action = form.get("action", "")
             status = (
@@ -1575,7 +1617,7 @@ class ReviewWebHandler(BaseHTTPRequestHandler):
                 else ""
             )
             if not proposal_id or not status:
-                self.redirect("/improvements?error=" + quote_plus("Invalid proposal action"))
+                self.redirect(app_path(request_prefix, "/improvements") + "?error=" + quote_plus("Invalid proposal action"))
                 return
             try:
                 review_improvement_proposal(
@@ -1586,30 +1628,33 @@ class ReviewWebHandler(BaseHTTPRequestHandler):
                     note=form.get("note", ""),
                 )
                 self.redirect(
-                    f"/improvements/{quote_plus(proposal_id)}?message="
+                    app_path(request_prefix, f"/improvements/{quote_plus(proposal_id)}") + "?message="
                     + quote_plus(f"{status.title()} {proposal_id}")
                 )
             except Exception as exc:
-                self.redirect(f"/improvements/{quote_plus(proposal_id)}?error={quote_plus(str(exc))}")
+                self.redirect(app_path(request_prefix, f"/improvements/{quote_plus(proposal_id)}") + f"?error={quote_plus(str(exc))}")
             return
 
-        self.redirect("/?error=" + quote_plus("Unsupported action"))
+        self.redirect(app_path(request_prefix, "/") + "?error=" + quote_plus("Unsupported action"))
 
 
 class ReviewWebServer(ThreadingHTTPServer):
-    def __init__(self, server_address: tuple[str, int], handler_class: type[BaseHTTPRequestHandler], *, paths: dict[str, Path], config_file: str) -> None:
+    def __init__(self, server_address: tuple[str, int], handler_class: type[BaseHTTPRequestHandler], *, paths: dict[str, Path], config_file: str, path_prefix: str = "") -> None:
         super().__init__(server_address, handler_class)
         self.paths = paths
         self.config_file = config_file
+        self.path_prefix = path_prefix
 
 
 def main() -> int:
     args = parse_args()
     paths = load_paths(args.config)
     ensure_dirs(paths)
+    config = load_agent_config(args.config)
+    path_prefix = normalize_path_prefix((config.get("common") or {}).get("review_web_base_url"))
 
-    server = ReviewWebServer((args.host, args.port), ReviewWebHandler, paths=paths, config_file=args.config)
-    print(f"Review UI listening on http://{args.host}:{args.port}")
+    server = ReviewWebServer((args.host, args.port), ReviewWebHandler, paths=paths, config_file=args.config, path_prefix=path_prefix)
+    print(f"Review UI listening on http://{args.host}:{args.port}{path_prefix or '/'}")
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()

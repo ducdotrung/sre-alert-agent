@@ -1,0 +1,25 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: sre-alert-review-web-shared-host
+  namespace: sre-alert-agent
+spec:
+  gateways:
+    - platform/shared-gateway
+  hosts:
+    - shared.example.com
+  http:
+    - name: sre-alert-review-web-shared-host
+      headers:
+        request:
+          set:
+            x-forwarded-port: "443"
+            x-forwarded-proto: https
+      match:
+        - uri:
+            prefix: /sre-alert-review
+      route:
+        - destination:
+            host: sre-alert-review-web
+            port:
+              number: 8088

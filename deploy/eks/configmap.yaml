@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-alert-agent-config
+data:
+  CONFIG_FILE: config/agent_config.yaml
+  PIPELINE_SOURCE: sentry
+  SENTRY_OUTPUT_DIR: /app/output
+  SENTRY_METRICS_DIR: /app/output/metrics
+  LOG_DIR: /app/output/logs
+  LOCK_FILE: /app/output/pipeline.lock
+  PIPELINE_STATE_FILE: /app/output/metrics/pipeline_state.json
+  LOG_LEVEL: INFO
+  TRIAGE_LOOKBACK_MINUTES: "2"
+  REVIEW_WEB_PORT: "8088"
+  REVIEW_WEB_BASE_URL: "${REVIEW_WEB_BASE_URL}"
+  PENDING_REVIEW_NOTIFICATION_ENABLED: "false"
+  HEALTH_MONITOR_ENABLED: "true"
+  HEALTH_STALE_RUN_AFTER_MINUTES: "120"
+  HEALTH_STUCK_LOCK_AFTER_MINUTES: "90"
+  QUEUE_MONITOR_ENABLED: "true"
+  QUEUE_PENDING_THRESHOLD: "10"
+  QUEUE_APPROVED_STALE_HOURS: "4"
+  QUEUE_RECOMMENDATION_STALE_HOURS: "2"
+  DAILY_SUMMARY_ENABLED: "false"
+  SELF_IMPROVE_ENABLED: "true"

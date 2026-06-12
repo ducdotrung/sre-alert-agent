@@ -58,9 +58,15 @@ def generate_recommendation(
         prompt = format_prompt(
             template,
             issue_id=approved_issue['issue_id'],
+            source=approved_issue.get('source') or 'unknown',
+            source_type=approved_issue.get('source_type') or 'unknown',
             title=metadata['title'],
+            summary=metadata.get('summary') or '',
             project=metadata['project'],
+            service=metadata.get('service') or '',
+            environment=metadata.get('environment') or '',
             classification=final_classification['class'],
+            classification_reasoning=final_classification.get('reasoning') or '',
             priority=final_classification['priority'],
             danger=final_classification['danger'],
             count=metadata['count'],
@@ -74,6 +80,7 @@ def generate_recommendation(
             link=metadata['link'],
             review_decision=review.get('decision', 'send'),
             review_confidence=review.get('confidence', 0.0),
+            review_reasoning=review.get('reasoning', ''),
             user_impact=json.dumps(review.get('user_impact', {}), indent=2),
             urgency=json.dumps(review.get('urgency', {}), indent=2),
         )

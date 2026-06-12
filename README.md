@@ -25,8 +25,11 @@ AI-assisted Sentry triage for Microsoft Teams. The system pulls recent Sentry is
 ## Main Docs
 
 - [repo-memory/current-state.md](repo-memory/current-state.md) - active repo memory, current implementation state, and likely next step
-- [QUICKSTART.md](QUICKSTART.md) - 5 minute local test
-- [DEPLOYMENT.md](DEPLOYMENT.md) - workstation setup, cron, monitoring
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) - 5 minute local test
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - workstation setup, cron, monitoring
+- [deploy/eks/README.md](deploy/eks/README.md) - EKS packaging with ECR, EFS, and standard Ingress
+- [deploy/aks/README.md](deploy/aks/README.md) - AKS packaging reference
+- [docs/PROMPT_GUIDE.md](docs/PROMPT_GUIDE.md) - prompt contracts and source-specific prompt guidance
 - [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md) - logs, state files, debug flow, and day-2 operations
 - [docs/WORKSTATION_MONITORING.md](docs/WORKSTATION_MONITORING.md) - AI usage ledger and budget alerts on the workstation
 - [docs/SELF_IMPROVEMENT_AGENT.md](docs/SELF_IMPROVEMENT_AGENT.md) - AI-assisted self-improvement design and rollout guardrails
@@ -107,5 +110,6 @@ output/
 
 - Keep real credentials in `.env` on the workstation or a private env file outside Git.
 - Budget enforcement now emits a separate monitoring notification when enforcement activates or clears.
+- The review web now supports either a root deployment or a shared-host subpath, controlled by `REVIEW_WEB_BASE_URL`.
 - `AGENTS.md` is the developer/operator reference for this repo, not the business summary.
 - Older `docs/` files are still useful as reference, but the files above are the main entry points.
