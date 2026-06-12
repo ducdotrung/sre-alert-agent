@@ -12,6 +12,7 @@ Last updated: 2026-06-12
 - Monitoring work is implemented for current scope: usage ledger, budgets, pipeline health, queue health, daily summary, and static dashboard.
 - Self-improvement proposals now support per-proposal storage, review decisions, patch artifacts, manual apply bookkeeping, and impact measurement.
 - Public-safe container packaging now exists as `Dockerfile` and `requirements.txt`, and Kubernetes examples now exist under both `deploy/aks/` and `deploy/eks/`.
+- Host quick-deploy assets now include a managed cron example under `deploy/systemd/` for triage, health, and self-improvement jobs.
 - Prompt contracts are refreshed and documented in `docs/PROMPT_GUIDE.md`.
 
 ## Current Truth By Area

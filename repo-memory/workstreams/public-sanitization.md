@@ -17,6 +17,7 @@ Remove company- or person-specific identifiers so the repo can be shared publicl
 - Neutralized internal-only UI wording in `scripts/review_web.py`.
 - Imported another round of private-repo changes while keeping public-safe placeholders in `deploy/aks/`, `docs/PROMPT_GUIDE.md`, `README.md`, and `docs/DEPLOYMENT.md`.
 - Replaced hardcoded registry, hostname, namespace, and gateway details from the private AKS manifests with generic examples.
+- Added a public-safe `/etc/cron.d` example under `deploy/systemd/` using `/opt/sre-alert-agent` and generic log paths.
 
 ## Remaining Work
 

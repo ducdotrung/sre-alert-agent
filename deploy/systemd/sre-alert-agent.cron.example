@@ -1,0 +1,5 @@
+PATH=/usr/local/bin:/usr/bin:/bin
+
+* * * * * root cd /opt/sre-alert-agent && ./scripts/run_triage.sh --minutes 2 >> /var/log/sre-alert-agent.log 2>&1
+*/5 * * * * root cd /opt/sre-alert-agent && /usr/bin/python3 scripts/check_pipeline_health.py >> /opt/sre-alert-agent/output/logs/health-cron.log 2>&1
+15 2 * * 1 root cd /opt/sre-alert-agent && ./scripts/run_self_improve.sh >> /opt/sre-alert-agent/output/logs/self-improve-cron.log 2>&1

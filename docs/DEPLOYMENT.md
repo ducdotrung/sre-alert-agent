@@ -98,11 +98,15 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-The repo includes a template at [../deploy/systemd/sentry-review-web.service.example](../deploy/systemd/sentry-review-web.service.example).
+The repo includes a template at [../deploy/systemd/review-web.service.example](../deploy/systemd/review-web.service.example).
 
 ## 6. Scheduled Execution
 
-Use either cron or a scheduler of your choice. See [CRONJOB_SETUP.md](CRONJOB_SETUP.md) for examples.
+Use either cron or a scheduler of your choice. For the fastest host setup, the repo includes:
+
+- [../deploy/systemd/sre-alert-agent.cron.example](../deploy/systemd/sre-alert-agent.cron.example)
+
+See [CRONJOB_SETUP.md](CRONJOB_SETUP.md) for details and alternatives.
 
 ## 7. Upgrade Flow
 
