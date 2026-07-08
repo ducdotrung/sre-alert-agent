@@ -16,7 +16,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: review-web
-          image: ghcr.io/example/sre-alert-agent:latest
+          image: ghcr.io/example/sre-alert-agent:1.0
           imagePullPolicy: IfNotPresent
           command:
             - /bin/bash

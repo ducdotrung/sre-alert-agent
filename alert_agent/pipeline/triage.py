@@ -12,7 +12,8 @@ from typing import Any
 
 import yaml
 
-from alert_agent.core.ai_client import PiAIClient, format_prompt
+from alert_agent.core.ai_client import format_prompt
+from alert_agent.core.ai_factory import create_ai_provider
 from alert_agent.core.config_loader import (
     get_repo_root,
     load_pipeline_stage_config,
@@ -152,7 +153,7 @@ def assess_danger(issue_class: str, priority: str, count: int, users: int) -> st
 def reclassify_with_ai(
     alert: AlertRecord,
     rule_result: dict[str, Any],
-    ai_client: PiAIClient,
+    ai_client: Any,
     prompt_path: Path,
 ) -> dict[str, Any]:
     try:
@@ -380,16 +381,23 @@ def run(
     ai_client = None
     if config.get('ai', {}).get('enabled', False) and not dry_run:
         ai_config = config['ai']
-        ai_client = PiAIClient(
+        ai_client = create_ai_provider(
             provider=ai_config['provider'],
             model=ai_config.get('model'),
             api_key=ai_config.get('api_key'),
+            endpoint=ai_config.get('endpoint'),
+            deployment=ai_config.get('deployment'),
             metrics_dir=config.get('metrics_dir'),
             agent_name='triage_agent',
             run_id=config.get('run_id'),
             pricing=config.get('ai_pricing'),
+            timeout=ai_config.get('timeout', 60),
         )
-        logger.info("AI client initialized (provider=%s)", ai_config['provider'])
+        logger.info(
+            "AI client initialized (provider=%s, model=%s)",
+            ai_client.get_provider_name(),
+            ai_client.get_model_name(),
+        )
     else:
         logger.info("AI reclassification disabled (dry-run or config)")
 

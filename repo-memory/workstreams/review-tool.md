@@ -1,6 +1,6 @@
 # Workstream: Review Tool
 
-Last updated: 2026-06-12
+Last updated: 2026-07-08
 
 ## Goal
 
@@ -19,6 +19,11 @@ Make pending alerts easy to inspect, decide, audit, and dispatch without direct 
 - Web UI in `scripts/review_web.py`
 - Queue tabs, issue detail pages, manual actions, metrics page, and improvement proposal listing
 - Review web routing now supports both `/` and a configured subpath such as `/sre-alert-review`, using `common.review_web_base_url` as the canonical outbound base URL
+- Pending-review Teams cards now include inline review, queue, and source links plus explicit URL facts
+
+## Related Sender Guardrails
+
+- `alert_agent/pipeline/sender.py` now backfills recommendation metadata from queue JSON, rejects stale recommendations using `pipeline.sender.max_last_seen_age_hours`, validates live Sentry issue existence when enabled, and writes skipped receipts under `output/alerts/skipped/`
 
 ## Remaining Work
 

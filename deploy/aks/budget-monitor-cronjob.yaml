@@ -1,9 +1,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: sre-alert-queue-health
+  name: sre-alert-budget-monitor
 spec:
-  schedule: "*/10 * * * *"
+  schedule: "15 * * * *"
   timeZone: "Etc/UTC"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 2
@@ -16,13 +16,13 @@ spec:
           securityContext:
             fsGroup: 1000
           containers:
-            - name: queue-health
-              image: "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+            - name: monitor
+              image: ghcr.io/example/sre-alert-agent:1.0
               imagePullPolicy: IfNotPresent
               command:
                 - /bin/bash
                 - -lc
-                - python3 scripts/check_queue_health.py --config "${CONFIG_FILE}"
+                - python3 scripts/check_ai_budget.py --config "${CONFIG_FILE}"
               envFrom:
                 - configMapRef:
                     name: sre-alert-agent-config
@@ -30,10 +30,10 @@ spec:
                     name: sre-alert-agent-secrets
               resources:
                 requests:
-                  cpu: 100m
+                  cpu: 50m
                   memory: 128Mi
                 limits:
-                  cpu: 250m
+                  cpu: 200m
                   memory: 256Mi
               volumeMounts:
                 - name: output

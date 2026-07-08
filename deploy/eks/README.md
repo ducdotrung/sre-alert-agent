@@ -40,29 +40,31 @@ The manifests are written to be rendered with environment variables, so you do n
 ```bash
 export AWS_ACCOUNT_ID=123456789012
 export AWS_REGION=us-east-1
-export IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/sre-alert-agent:latest
+export IMAGE_REPOSITORY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/sre-alert-agent
+export IMAGE_TAG=1.0
 
 aws ecr get-login-password --region $AWS_REGION \
   | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-docker build -t $IMAGE_URI .
-docker push $IMAGE_URI
+docker build -t $IMAGE_REPOSITORY:$IMAGE_TAG .
+docker push $IMAGE_REPOSITORY:$IMAGE_TAG
 ```
 
 The manifests in this directory currently point at:
 
 ```text
-${IMAGE_URI}
+${IMAGE_REPOSITORY}:${IMAGE_TAG}
 ```
 
-Change the tag before each release by updating `IMAGE_URI` before rendering.
+Keep the repository in env vars and change `IMAGE_TAG` when you cut a new build.
 
 ## Required Environment Variables
 
 Set these before rendering:
 
 ```bash
-export IMAGE_URI=123456789012.dkr.ecr.us-east-1.amazonaws.com/sre-alert-agent:latest
+export IMAGE_REPOSITORY=123456789012.dkr.ecr.us-east-1.amazonaws.com/sre-alert-agent
+export IMAGE_TAG=1.0
 export REVIEW_WEB_BASE_URL=https://alerts.example.com
 export EKS_REVIEW_WEB_HOST=alerts.example.com
 export AWS_ACM_CERT_ARN=arn:aws:acm:us-east-1:123456789012:certificate/replace-me

@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
-from alert_agent.core.ai_client import PiAIClient
+from alert_agent.core.ai_factory import create_ai_provider
 from alert_agent.core.config_loader import load_agent_config
 from alert_agent.improvement.analyzer import analyze_review_cases
 from alert_agent.improvement.collector import build_review_cases, read_audit_events
@@ -57,7 +57,7 @@ def has_new_review_events(config_file: str, config: dict[str, Any], previous_sta
     return count > int(previous_state.get("last_audit_event_count") or 0), count
 
 
-def build_ai_client(config: dict[str, Any]) -> PiAIClient | None:
+def build_ai_client(config: dict[str, Any]):
     ai_config = dict(config.get("ai") or {})
     if str(ai_config.get("enabled", "true")).lower() not in {"1", "true", "yes", "on"}:
         return None
@@ -68,16 +68,22 @@ def build_ai_client(config: dict[str, Any]) -> PiAIClient | None:
         "AZURE_OPENAI_DEPLOYMENT_NAME_MAP": str(ai_config.get("deployment_name_map") or ""),
         "AI_TIMEOUT": str(ai_config.get("timeout") or ""),
     }
-    return PiAIClient(
-        provider=str(ai_config.get("provider") or "azure-openai-responses"),
-        model=str(ai_config.get("model") or "") or None,
-        api_key=str(ai_config.get("api_key") or "") or None,
-        metrics_dir=config.get("metrics_dir"),
-        agent_name="self_improve",
-        run_id=config.get("run_id"),
-        pricing=config.get("ai_pricing"),
-        extra_env=extra_env,
-    )
+    provider = str(ai_config.get("provider") or "azure-openai-responses")
+    kwargs = {
+        "provider": provider,
+        "model": str(ai_config.get("model") or "") or None,
+        "endpoint": ai_config.get("endpoint"),
+        "deployment": ai_config.get("deployment"),
+        "metrics_dir": config.get("metrics_dir"),
+        "agent_name": "self_improve",
+        "run_id": config.get("run_id"),
+        "pricing": config.get("ai_pricing"),
+        "timeout": ai_config.get("timeout", 120),
+        "extra_env": extra_env,
+    }
+    if provider != "azure-litellm":
+        kwargs["api_key"] = str(ai_config.get("api_key") or "") or None
+    return create_ai_provider(**kwargs)
 
 
 def run(config_file: str, config: dict[str, Any], *, force: bool = False, dry_run: bool = False) -> int:

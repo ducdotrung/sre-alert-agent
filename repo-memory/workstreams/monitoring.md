@@ -1,6 +1,6 @@
 # Workstream: Monitoring
 
-Last updated: 2026-06-10
+Last updated: 2026-07-08
 
 ## Goal
 
@@ -22,6 +22,8 @@ Keep workstation operations visible without adding a database or backend service
 - daily summary
 - static dashboard
 - budget enforcement modes
+- daily summary now distinguishes `sent_today` from `sent_archive`
+- Kubernetes packaging now includes budget-monitor CronJobs in both `deploy/aks/` and `deploy/eks/`
 
 ## Current Assessment
 

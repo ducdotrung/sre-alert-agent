@@ -10,4 +10,6 @@ resources:
   - ingress.yaml
   - pipeline-cronjob.yaml
   - pipeline-health-cronjob.yaml
+  - queue-health-cronjob.yaml
+  - budget-monitor-cronjob.yaml
   - self-improve-cronjob.yaml

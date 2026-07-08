@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import logging
 from pathlib import Path
 from typing import Any, Sequence, TextIO
@@ -41,6 +42,32 @@ def queue_count(directory: Path, pattern: str) -> int:
     if not directory.exists():
         return 0
     return len(list(directory.glob(pattern)))
+
+
+def sent_count_for_date(sent_dir: Path, summary_date: dt.date) -> int:
+    """Count sender receipts written for the target UTC date."""
+    if not sent_dir.exists():
+        return 0
+
+    count = 0
+    for receipt_path in sent_dir.glob("*.receipt.json"):
+        try:
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        raw_timestamp = payload.get("sentAt")
+        if not raw_timestamp:
+            continue
+        try:
+            sent_at = dt.datetime.fromisoformat(str(raw_timestamp).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=dt.timezone.utc)
+        if sent_at.astimezone(dt.timezone.utc).date() == summary_date:
+            count += 1
+    return count
 
 
 def top_agents_text(summary: dict[str, Any]) -> str:
@@ -108,7 +135,8 @@ def build_summary_card(
                 "activityTitle": "Queue Snapshot",
                 "text": (
                     f"pending={queue_summary['pending']}; approved={queue_summary['approved']}; "
-                    f"recommendations={queue_summary['recommendations']}; sent={queue_summary['sent']}"
+                    f"recommendations={queue_summary['recommendations']}; "
+                    f"sent_today={queue_summary['sent_today']}; sent_archive={queue_summary['sent_archive']}"
                 ),
                 "markdown": True,
             },
@@ -165,7 +193,8 @@ def run(
         'pending': queue_count(output_dir / 'alerts' / 'pending', '*.json'),
         'approved': queue_count(output_dir / 'alerts' / 'approved', '*.json'),
         'recommendations': queue_count(output_dir / 'alerts' / 'recommendations', '*.md'),
-        'sent': queue_count(output_dir / 'alerts' / 'sent', '*.md'),
+        'sent_today': sent_count_for_date(output_dir / 'alerts' / 'sent', summary_date),
+        'sent_archive': queue_count(output_dir / 'alerts' / 'sent', '*.md'),
     }
 
     card = build_summary_card(summary_date, usage_summary, pipeline_state, queue_summary)

@@ -10,7 +10,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from alert_agent.core.ai_client import PiAIClient, format_prompt
+from alert_agent.core.ai_client import format_prompt
+from alert_agent.core.ai_factory import create_ai_provider
 from alert_agent.core.config_loader import (
     get_repo_root,
     load_pipeline_stage_config,
@@ -53,7 +54,7 @@ def load_review_prompt(repo_root: Path, config_file: str, pack_name: str) -> str
 
 def review_with_ai(
     triage_result: dict[str, Any],
-    ai_client: PiAIClient,
+    ai_client: Any,
     repo_root: Path,
     config_file: str,
 ) -> dict[str, Any]:
@@ -164,14 +165,24 @@ def run(*, config_file: str, dry_run: bool = False) -> int:
     notification_state = load_notification_state(config)
     if config.get('ai', {}).get('enabled', False) and not dry_run:
         ai_config = config['ai']
-        ai_client = PiAIClient(
-            provider=ai_config['provider'],
-            model=ai_config.get('model'),
-            api_key=ai_config.get('api_key'),
-            metrics_dir=config.get('metrics_dir'),
-            agent_name='review_agent',
-            run_id=config.get('run_id'),
-            pricing=config.get('ai_pricing'),
+        kwargs = {
+            'provider': ai_config['provider'],
+            'model': ai_config.get('model'),
+            'endpoint': ai_config.get('endpoint'),
+            'deployment': ai_config.get('deployment'),
+            'metrics_dir': config.get('metrics_dir'),
+            'agent_name': 'review_agent',
+            'run_id': config.get('run_id'),
+            'pricing': config.get('ai_pricing'),
+            'timeout': ai_config.get('timeout', 60),
+        }
+        if ai_config['provider'] != 'azure-litellm':
+            kwargs['api_key'] = ai_config.get('api_key')
+        ai_client = create_ai_provider(**kwargs)
+        logger.info(
+            "AI client initialized (provider=%s, model=%s)",
+            ai_client.get_provider_name(),
+            ai_client.get_model_name(),
         )
     else:
         logger.error("Review agent requires AI to be enabled")

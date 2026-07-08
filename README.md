@@ -13,7 +13,7 @@ AI-assisted Sentry triage for Microsoft Teams. The system pulls recent Sentry is
 
 - Production triage pipeline runs through `scripts/run_triage.sh`.
 - Internal pipeline now runs through `alert_agent/pipeline/` with a source plugin layer under `alert_agent/sources/`.
-- Azure OpenAI support for `pi` is wired and tested through `.env`.
+- Azure OpenAI via `pi` is wired, and an Azure LiteLLM provider path now exists for company-specific deployments.
 - Bulk Sentry corpus analysis exists in `scripts/analyze_sentry_corpus.py`.
 - Recent tuning reduced the 14-day unknown classification bucket from `48` issues to `31`.
 

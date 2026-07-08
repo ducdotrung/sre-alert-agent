@@ -116,6 +116,8 @@ class MonitorCommandTests(unittest.TestCase):
             metrics_dir = root / "metrics"
             output_dir = root / "output"
             (output_dir / "alerts" / "pending").mkdir(parents=True)
+            sent_dir = output_dir / "alerts" / "sent"
+            sent_dir.mkdir(parents=True)
             metrics_dir.mkdir(parents=True)
 
             now = dt.datetime.now(dt.timezone.utc)
@@ -140,6 +142,17 @@ class MonitorCommandTests(unittest.TestCase):
                 json.dumps({"status": "completed", "updated_at": now.isoformat()}),
                 encoding="utf-8",
             )
+            (sent_dir / "BACKEND-1.md").write_text("# sent today\n", encoding="utf-8")
+            (sent_dir / "BACKEND-1.md.receipt.json").write_text(
+                json.dumps({"sentAt": now.isoformat()}),
+                encoding="utf-8",
+            )
+            yesterday = now - dt.timedelta(days=1)
+            (sent_dir / "BACKEND-2.md").write_text("# old sent\n", encoding="utf-8")
+            (sent_dir / "BACKEND-2.md.receipt.json").write_text(
+                json.dumps({"sentAt": yesterday.isoformat()}),
+                encoding="utf-8",
+            )
 
             stdout = io.StringIO()
             exit_code = run_daily_summary(
@@ -156,6 +169,8 @@ class MonitorCommandTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 2)
             self.assertIn("Daily Monitoring Summary", stdout.getvalue())
+            self.assertIn("sent_today=1", stdout.getvalue())
+            self.assertIn("sent_archive=2", stdout.getvalue())
 
 
 if __name__ == "__main__":

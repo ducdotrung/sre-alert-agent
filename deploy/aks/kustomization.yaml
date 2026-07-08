@@ -9,4 +9,5 @@ resources:
   - review-web-service.yaml
   - pipeline-cronjob.yaml
   - pipeline-health-cronjob.yaml
+  - budget-monitor-cronjob.yaml
   - self-improve-cronjob.yaml

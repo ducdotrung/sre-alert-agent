@@ -34,6 +34,7 @@ The current orchestrator still assumes relative `output/` paths in a few places.
 - `review-web-deployment.yaml`: review UI pod
 - `review-web-service.yaml`: ClusterIP service for the review UI
 - `pipeline-cronjob.yaml`: main triage -> review -> recommendation -> sender pipeline
+- `budget-monitor-cronjob.yaml`: AI budget monitor
 - `pipeline-health-cronjob.yaml`: stale-run and lock monitoring
 - `self-improve-cronjob.yaml`: weekly self-improvement run
 - `queue-health-cronjob.yaml`: optional extra queue monitor
@@ -44,17 +45,27 @@ The current orchestrator still assumes relative `output/` paths in a few places.
 ## Build And Push
 
 ```bash
-docker build -t ghcr.io/example/sre-alert-agent:latest .
-docker push ghcr.io/example/sre-alert-agent:latest
+docker build -t ghcr.io/example/sre-alert-agent:1.0 .
+docker push ghcr.io/example/sre-alert-agent:1.0
 ```
 
 The manifests in this directory currently point at:
 
 ```text
-ghcr.io/example/sre-alert-agent:latest
+ghcr.io/example/sre-alert-agent:1.0
 ```
 
 Change the tag before each release, or patch it with Kustomize or `kubectl set image`.
+
+## Company AKS Notes
+
+The newer `sre-alert-agents` branch used a company-specific CN ACR path and shared-gateway Istio routing. Keep this repo's public-safe placeholders by default, but for the internal company deployment you can map the same manifests to:
+
+- registry pattern like `sre-example/agent/sre-alert-agents/main:<tag>`
+- shared host routing such as `https://sre.example/sre-alert-review`
+- `REVIEW_WEB_BASE_URL` set to the exact public URL you want Teams cards to emit
+
+If you need the full internal AKS notes, use `~/devops/sre-alert-agents/deploy/aks/README.md` as the detailed company reference and keep `deploy/eks/` here as the hackathon AWS path.
 
 ## First Apply
 

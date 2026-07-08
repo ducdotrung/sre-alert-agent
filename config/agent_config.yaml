@@ -39,6 +39,8 @@ pipeline:
       provider: ${AI_PROVIDER:azure-openai-responses}
       model: ${AI_MODEL:}
       api_key: ${AI_API_KEY:}
+      endpoint: ${AZURE_LITELLM_ENDPOINT:}
+      deployment: ${AZURE_LITELLM_DEPLOYMENT:}
       timeout: 60
 
   review:
@@ -54,6 +56,8 @@ pipeline:
       provider: ${AI_PROVIDER:azure-openai-responses}
       model: ${AI_MODEL:}
       api_key: ${AI_API_KEY:}
+      endpoint: ${AZURE_LITELLM_ENDPOINT:}
+      deployment: ${AZURE_LITELLM_DEPLOYMENT:}
       timeout: 60
 
   recommendation:
@@ -66,12 +70,15 @@ pipeline:
       provider: ${AI_PROVIDER:azure-openai-responses}
       model: ${AI_MODEL:}
       api_key: ${AI_API_KEY:}
+      endpoint: ${AZURE_LITELLM_ENDPOINT:}
+      deployment: ${AZURE_LITELLM_DEPLOYMENT:}
       timeout: 90
   sender:
     teams_webhook_url: ${TEAMS_WEBHOOK_URL:}
     timeout: ${TEAMS_TIMEOUT:15}
     dry_run: ${SENDER_DRY_RUN:false}
     max_last_seen_age_hours: ${TEAMS_MAX_LAST_SEEN_AGE_HOURS:48}
+    validate_sentry_issue_links: ${TEAMS_VALIDATE_SENTRY_ISSUES:true}
 
 # Common settings for all agents
 common:
@@ -146,6 +153,8 @@ self_improve:
     provider: ${SELF_IMPROVE_AI_PROVIDER:${AI_PROVIDER:azure-openai-responses}}
     model: ${SELF_IMPROVE_AI_MODEL:${AI_MODEL:}}
     api_key: ${SELF_IMPROVE_AI_API_KEY:${AZURE_OPENAI_API_KEY:}}
+    endpoint: ${SELF_IMPROVE_AI_ENDPOINT:${AZURE_LITELLM_ENDPOINT:}}
+    deployment: ${SELF_IMPROVE_AI_DEPLOYMENT:${AZURE_LITELLM_DEPLOYMENT:}}
     base_url: ${SELF_IMPROVE_AI_BASE_URL:${AZURE_OPENAI_BASE_URL:}}
     deployment_name_map: ${SELF_IMPROVE_AI_DEPLOYMENT_NAME_MAP:${AZURE_OPENAI_DEPLOYMENT_NAME_MAP:}}
     timeout: ${SELF_IMPROVE_AI_TIMEOUT:120}

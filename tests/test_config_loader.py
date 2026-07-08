@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from alert_agent.core.config_loader import (
+    get_repo_root,
     load_pipeline_stage_config,
     load_policy_pack,
     load_source_config,
@@ -103,6 +105,16 @@ policy_packs:
 
             with self.assertRaisesRegex(KeyError, "Policy pack 'grafana-default' not found"):
                 load_policy_pack("grafana-default", config_path)
+
+    def test_get_repo_root_prefers_runtime_tree_from_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runtime_root = Path(tmpdir)
+            (runtime_root / "config").mkdir()
+            (runtime_root / "alert_agent").mkdir()
+            (runtime_root / "config" / "agent_config.yaml").write_text("common: {}\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"REPO_ROOT": str(runtime_root)}, clear=False):
+                self.assertEqual(get_repo_root(), runtime_root.resolve())
 
 
 if __name__ == "__main__":

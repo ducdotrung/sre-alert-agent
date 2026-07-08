@@ -79,6 +79,15 @@ def build_pending_review_card(issue: dict[str, Any], config: dict[str, Any]) -> 
     sentry_url = str(metadata.get("link") or "")
     reasoning = str(review.get("reasoning") or final.get("reasoning") or "Manual review is required.")
     reasoning = reasoning[:700] + "..." if len(reasoning) > 700 else reasoning
+    link_lines: list[str] = []
+    if review_url:
+        link_lines.append(f"[Open review]({review_url})")
+    if queue_url:
+        link_lines.append(f"[Open queue]({queue_url})")
+    if sentry_url:
+        link_lines.append(f"[Open in Sentry]({sentry_url})")
+    if link_lines:
+        reasoning = f"{reasoning}\n\n" + " | ".join(link_lines)
 
     card: dict[str, Any] = {
         "@type": "MessageCard",
@@ -108,6 +117,9 @@ def build_pending_review_card(issue: dict[str, Any], config: dict[str, Any]) -> 
                     {"name": "Users", "value": str(metadata.get("users") or 0)},
                     {"name": "Review Decision", "value": str(review.get("decision") or "review")},
                     {"name": "AI Confidence", "value": f"{float(review.get('confidence') or 0):.0%}"},
+                    {"name": "Review URL", "value": review_url or "not configured"},
+                    {"name": "Queue URL", "value": queue_url or "not configured"},
+                    {"name": "Source URL", "value": sentry_url or "not available"},
                 ],
             },
         ],

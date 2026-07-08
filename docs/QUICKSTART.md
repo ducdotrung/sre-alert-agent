@@ -25,6 +25,15 @@ AZURE_OPENAI_BASE_URL=https://your-resource.cognitiveservices.azure.com
 TEAMS_WEBHOOK_URL=https://example.invalid/webhook
 ```
 
+If your company environment uses the Azure LiteLLM gateway instead of direct Azure OpenAI, swap in:
+
+```bash
+AI_PROVIDER=azure-litellm
+AZURE_LITELLM_ENDPOINT=https://your-litellm-gateway.example/openai/v1
+AZURE_LITELLM_DEPLOYMENT=your-deployment-name
+AZURE_LITELLM_API_KEY=replace-with-key
+```
+
 If you only want to exercise the pipeline locally, keep sender commands in dry-run mode.
 
 ## 2. Validate Dependencies

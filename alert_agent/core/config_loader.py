@@ -181,16 +181,24 @@ def get_repo_root() -> Path:
         Path to repo root
 
     Raises:
-        RuntimeError: If not in a git repo
+        RuntimeError: If not in a recognizable source tree
     """
+    env_root = os.environ.get("REPO_ROOT", "").strip()
+    if env_root:
+        candidate = Path(env_root).expanduser().resolve()
+        if candidate.exists():
+            return candidate
+
     current = Path(__file__).resolve()
 
-    # Walk up until we find .git or reach root
+    # Walk up until we find either a git checkout or a copied runtime tree.
     for parent in [current] + list(current.parents):
         if (parent / '.git').exists():
             return parent
+        if (parent / 'config' / 'agent_config.yaml').exists() and (parent / 'alert_agent').is_dir():
+            return parent
 
-    raise RuntimeError("Not in a git repository")
+    raise RuntimeError("Not in a recognized repository or runtime tree")
 
 
 def load_full_config(config_file: str = "config/agent_config.yaml") -> dict[str, Any]:

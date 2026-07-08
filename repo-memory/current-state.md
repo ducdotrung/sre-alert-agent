@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-06-12
+Last updated: 2026-07-08
 
 ## Repo Snapshot
 
@@ -14,6 +14,11 @@ Last updated: 2026-06-12
 - Public-safe container packaging now exists as `Dockerfile` and `requirements.txt`, and Kubernetes examples now exist under both `deploy/aks/` and `deploy/eks/`.
 - Host quick-deploy assets now include a managed cron example under `deploy/systemd/` for triage, health, and self-improvement jobs.
 - Prompt contracts are refreshed and documented in `docs/PROMPT_GUIDE.md`.
+- Shared AI wiring now supports either the existing `pi` providers or an `azure-litellm` provider plugin for company-specific deployments.
+- Sender now guards against stale or deleted Sentry issues before posting to Teams and records skipped recommendations under `output/alerts/skipped/`.
+- Daily summary now separates `sent_today` from the cumulative sent archive count.
+- Container/runtime packaging now includes the newer Node runtime required by current `pi` releases.
+- Deploy packaging now includes budget-monitor CronJobs, and the EKS manifests use env-driven `IMAGE_REPOSITORY` + `IMAGE_TAG` examples with tag `1.0`.
 
 ## Current Truth By Area
 
@@ -22,11 +27,13 @@ Last updated: 2026-06-12
 - Status: stable for current planned scope
 - Source of truth: `docs/WORKSTATION_MONITORING.md` plus the monitoring scripts in `scripts/`
 - Note: the old monitoring roadmap was removed after moving active status tracking into `repo-memory/`.
+- Recent update: `send_daily_summary.py` now reports `sent_today` separately from `sent_archive`, and both `deploy/aks/` and `deploy/eks/` now package the budget-monitor CronJob.
 
 ### Review Tool
 
 - Status: usable now
 - Implemented: CLI review workflow, review web UI, audit history, pending-review notifications, direct review links, root/subpath routing support
+- Recent update: pending-review Teams cards now surface Review URL / Queue URL / Source URL facts inline so links remain visible even when Teams hides buttons
 - Remaining gap: remaining work is mostly ergonomics and deeper review workflows
 - Source of truth: `scripts/review_queue.py`, `scripts/review_web.py`, and this memory folder
 
@@ -83,7 +90,7 @@ The next major options are:
 1. add the second source plugin, likely Grafana, to validate the architecture with a real non-Sentry source
 2. add source filter and source labels to the review UI
 3. refine the new `deploy/eks/` package for the exact hackathon AWS environment, or keep using its env-driven render flow for image, hostname, ACM cert, and EFS storage class
-4. fix the Azure/OpenAI review-agent config path so workstation review runs stop falling back to manual-review-only behavior
+4. validate the `azure-litellm` provider path against the real company gateway and confirm whether hackathon demos should keep `azure-openai-responses` or switch
 
 If the goal is architecture validation, the highest-value next step is implementing one real second source.
 

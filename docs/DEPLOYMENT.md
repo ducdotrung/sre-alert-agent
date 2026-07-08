@@ -58,6 +58,15 @@ SENTRY_METRICS_DIR=/opt/sre-alert-agent/output/metrics
 REVIEW_WEB_BASE_URL=http://localhost:8088
 ```
 
+For the company Azure LiteLLM route, use:
+
+```bash
+AI_PROVIDER=azure-litellm
+AZURE_LITELLM_ENDPOINT=https://your-litellm-gateway.example/openai/v1
+AZURE_LITELLM_DEPLOYMENT=your-deployment-name
+AZURE_LITELLM_API_KEY=replace-with-key
+```
+
 ## 3. Create Runtime Directories
 
 ```bash
